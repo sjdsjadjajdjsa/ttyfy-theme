@@ -8,8 +8,8 @@
 (function ttyfy() {
 	"use strict";
 
-	const VERSION = "0.1";
-	const PAGE = 15; // rows shown per page in a list
+	const VERSION = "0.2";
+	const PAGE = 15; // rows per page when the window height is unknown
 	const MAX_LINES = 600; // lines kept in the output
 	const ALIASES = { "?": "help", add: "queue", h: "help", n: "next", b: "back", prev: "previous", q: "queue", pl: "playlist", playlists: "playlist", ls: "playlist", s: "search", find: "search", p: "toggle", m: "more", exit: "gui", np: "now" };
 
@@ -31,6 +31,10 @@
 			return null;
 		}
 		return value;
+	}
+
+	function own(obj, key) {
+		return Object.prototype.hasOwnProperty.call(obj, key);
 	}
 
 	function hasPalette(name) {
@@ -103,6 +107,7 @@
 			view: null, // { kind: "playlists" | "tracks" | "search", title, uri, items, shown }
 			playlists: null, // cached list of the user's playlists
 			stack: [], // lists you came from, for /back
+			rows: [], // song rows on screen, so the playing one can be marked
 			history: [],
 			hpos: 0,
 			bar: false,
@@ -145,6 +150,22 @@
 			return d && d.item ? d.item : null;
 		}
 
+		function isPlaying(t) {
+			const c = current();
+			return !!c && !!t && c.uri === t.uri;
+		}
+
+		function isSongView(v) {
+			return !!v && (v.kind === "tracks" || v.kind === "search");
+		}
+
+		// Remember songs and playlists for /recent (newest first, 10 kept).
+		function remember(entry) {
+			const list = (store("recent") || []).filter((r) => r.uri !== entry.uri);
+			list.unshift(entry);
+			store("recent", list.slice(0, 10));
+		}
+
 		// ---------- page ----------
 
 		const root = el("div", "ttyfy");
@@ -154,6 +175,8 @@
 		const prompt = el("div", "ttyfy-prompt");
 		const ps = el("span", "ttyfy-ps");
 		const input = el("input", "ttyfy-in");
+		const inwrap = el("div", "ttyfy-inwrap");
+		const cursor = el("span", "ttyfy-cursor");
 
 		head.textContent = "ttyfy " + VERSION;
 		bar.hidden = true;
@@ -165,7 +188,8 @@
 		input.setAttribute("aria-label", "command line");
 		if (/Mac/i.test(navigator.platform || "")) root.classList.add("ttyfy-mac");
 
-		prompt.append(ps, input);
+		inwrap.append(input, cursor);
+		prompt.append(ps, inwrap);
 		root.append(head, out, bar, prompt);
 		document.body.appendChild(root);
 
@@ -176,11 +200,29 @@
 			out.appendChild(line);
 			while (out.childNodes.length > MAX_LINES) out.removeChild(out.firstChild);
 			if (follow) out.scrollTop = out.scrollHeight;
+			return line;
 		}
 
 		function printAll(lines, cls) {
 			lines.forEach((l) => print(l, cls));
 		}
+
+		// Rows per page: fit the window, leave room for the hint lines.
+		function pageSize() {
+			const h = out.clientHeight;
+			const lh = parseFloat(getComputedStyle(out).lineHeight) || 21;
+			if (!h) return PAGE;
+			return Math.max(8, Math.min(40, Math.floor(h / lh) - 4));
+		}
+
+		// Our own blinking block cursor. The native caret comes back when the text scrolls.
+		function updateCursor() {
+			root.classList.toggle("ttyfy-fakecaret", input.scrollLeft === 0);
+			cursor.style.left = (input.selectionStart || 0) + "ch";
+		}
+		["input", "keydown", "keyup", "click", "focus", "select", "mouseup"].forEach((ev) =>
+			input.addEventListener(ev, () => requestAnimationFrame(updateCursor))
+		);
 
 		function setTitle() {
 			const v = state.view;
@@ -287,12 +329,14 @@
 					if (page.length < 100) break;
 				}
 				items.forEach((t) => (t.album.name = albumName));
+				state.albumSource = "graphql";
 				return items;
 			} catch (e) {
 				// Fallback: the web API through Spicetify.
 				const id = uri.split(":").pop();
 				const res = await Spicetify.CosmosAsync.get("https://api.spotify.com/v1/albums/" + id + "/tracks?limit=50");
 				if (!res || res.code || res.error) throw new Error("could not load album: " + errText(res));
+				state.albumSource = "web";
 				return res.items.map((t) => Object.assign({}, t, { album: { uri } }));
 			}
 		}
@@ -320,7 +364,7 @@
 		// ---------- lists ----------
 
 		function trackLine(t, n, width) {
-			const here = current() && current().uri === t.uri;
+			const here = isPlaying(t);
 			const dur = durOf(t);
 			return (
 				String(n).padStart(width) + (here ? " > " : "   ") +
@@ -332,24 +376,39 @@
 			const v = state.view;
 			if (!v) return;
 			const width = String(v.items.length).length;
-			const end = Math.min(v.items.length, v.shown + PAGE);
+			const end = Math.min(v.items.length, v.shown + pageSize());
 			for (let i = v.shown; i < end; i++) {
 				const it = v.items[i];
-				if (v.kind === "playlists") print(String(i + 1).padStart(width) + "   " + it.name);
-				else print(trackLine(it, i + 1, width), current() && current().uri === it.uri ? "acc" : "");
+				const n = String(i + 1).padStart(width);
+				if (v.kind === "playlists") print(n + "   " + it.name);
+				else if (v.kind === "recent") print(n + "   " + (it.kind === "playlist" ? "[list] " + it.name : describe(it)));
+				else {
+					const line = print(trackLine(it, i + 1, width), isPlaying(it) ? "acc" : "");
+					state.rows.push({ line, t: it, n: i + 1, width });
+				}
 			}
 			v.shown = end;
 			const more = v.items.length - end;
-			const action = v.kind === "playlists" ? "open" : "play";
+			const action = v.kind === "playlists" ? "open" : v.kind === "recent" ? "play or open" : "play";
 			print(
 				(more ? more + " more: /more.  " : "") + "type a number to " + action + (state.stack.length ? ".  /back to go back" : ""),
 				"dim"
 			);
 		}
 
+		// Moves the > marker to the song that is playing now.
+		function refreshMarks() {
+			state.rows = state.rows.filter((r) => r.line.isConnected);
+			state.rows.forEach((r) => {
+				r.line.textContent = trackLine(r.t, r.n, r.width);
+				r.line.className = isPlaying(r.t) ? "ty-acc" : "";
+			});
+		}
+
 		// Clears the screen and draws a list from the top, so lists never pile up.
 		function render(v) {
 			out.textContent = "";
+			state.rows = [];
 			setTitle();
 			print(v.title + " (" + v.items.length + ")", "acc");
 			if (!v.items.length) print("empty", "dim");
@@ -378,7 +437,29 @@
 			const it = v.items[n - 1];
 			if (!it) return print("no item " + n + " (1-" + v.items.length + ")", "err");
 			if (v.kind === "playlists") return openPlaylist(it);
+			if (v.kind === "recent") return playRecent(it);
 			return playTrackInView(n);
+		}
+
+		async function playRecent(it) {
+			if (it.kind === "playlist") return openPlaylist(it);
+			await Player.playUri(it.uri);
+			print("playing: " + describe(it), "acc");
+		}
+
+		function textOf(v, it) {
+			if (v.kind === "playlists") return it.name;
+			if (v.kind === "recent" && it.kind === "playlist") return it.name;
+			return nameOf(it) + " " + artistsOf(it);
+		}
+
+		// Items of the list on screen where every word matches.
+		function matching(v, words) {
+			const ws = words.toLowerCase().split(/\s+/).filter(Boolean);
+			return v.items.filter((it) => {
+				const text = textOf(v, it).toLowerCase();
+				return ws.every((w) => text.includes(w));
+			});
 		}
 
 		async function openPlaylist(pl) {
@@ -386,6 +467,7 @@
 			const items = await loadTracks(pl);
 			openView("tracks", pl.name, items, pl.uri);
 			store("last", { name: pl.name, uri: pl.uri, liked: !!pl.liked });
+			remember({ kind: "playlist", name: pl.name, uri: pl.uri, liked: !!pl.liked });
 		}
 
 		function describe(t) {
@@ -414,7 +496,7 @@
 		function songFor(args) {
 			if (/^\d+$/.test(args)) {
 				const v = state.view;
-				const t = v && v.kind !== "playlists" && v.items[Number(args) - 1];
+				const t = isSongView(v) && v.items[Number(args) - 1];
 				if (!t) throw new Error("no song " + args + " on screen");
 				return t;
 			}
@@ -429,13 +511,24 @@
 			help: {
 				desc: "short list of commands, /help all shows every one",
 				run(args) {
+					if (args && args !== "all") {
+						const name = args.replace(/^\//, "").toLowerCase();
+						const real = own(ALIASES, name) ? ALIASES[name] : name;
+						if (!own(commands, real)) return print("no command: " + args, "err");
+						print("/" + real + "  " + commands[real].desc, "acc");
+						const al = Object.keys(ALIASES).filter((k) => ALIASES[k] === real);
+						if (al.length) print("  aliases: " + al.map((a) => "/" + a).join(" "), "dim");
+						return;
+					}
 					print("start here:", "acc");
 					print("  /playlist     browse your playlists, then type a number");
 					print("  /search words find a song, then type a number");
+					print("  /go words     jump to a match in the list on screen");
+					print("  /recent       what you played lately");
 					print("  /play words   play the first match");
 					print("  /pause  /resume  /next  /previous");
 					print("  /now          what is playing");
-					print("  /help all     every command");
+					print("  /help all     every command, /help <command> for one");
 					if (args !== "all") return;
 					print("more:", "acc");
 					Object.keys(commands)
@@ -446,13 +539,22 @@
 			clear: { desc: "clear the screen", run: () => (out.textContent = "") },
 			now: {
 				core: true,
-				desc: "show the current song",
+				desc: "show the current song with progress",
 				run() {
 					const t = current();
 					if (!t) return print("nothing playing", "dim");
+					const dur = Player.getDuration() || durOf(t);
+					const pos = Player.getProgress();
+					const filled = dur ? Math.min(20, Math.round((pos / dur) * 20)) : 0;
 					print((Player.isPlaying() ? "playing: " : "paused:  ") + describe(t), "acc");
-					const album = t.album && t.album.name;
-					print("  " + (album ? album + "  " : "") + fmtTime(Player.getProgress()) + "/" + fmtTime(Player.getDuration() || durOf(t)), "dim");
+					if (t.album && t.album.name) print("  album:   " + t.album.name, "dim");
+					print("  " + fmtTime(pos) + "/" + fmtTime(dur) + "  [" + "#".repeat(filled) + "-".repeat(20 - filled) + "]", "dim");
+					print(
+						"  vol " + Math.round(Player.getVolume() * 100) +
+							"  shuffle " + (Player.getShuffle() ? "on" : "off") +
+							"  repeat " + (["off", "all", "one"][Player.getRepeat()] || "off"),
+						"dim"
+					);
 				},
 			},
 			play: {
@@ -471,13 +573,13 @@
 							await Player.playUri(pl.uri);
 							return print("playing playlist: " + pl.name, "acc");
 						}
+						if (v.kind === "recent") return pick(n);
 						return playTrackInView(n);
 					}
 					// In an open list, words match a song in that list first.
-					if (v && v.kind !== "playlists") {
-						const q = args.toLowerCase();
-						const i = v.items.findIndex((t) => (t.name + " " + artistsOf(t)).toLowerCase().includes(q));
-						if (i >= 0) return playTrackInView(i + 1);
+					if (isSongView(v)) {
+						const hit = matching(v, args)[0];
+						if (hit) return playTrackInView(v.items.indexOf(hit) + 1);
 					}
 					const found = await searchTracks(args, 1);
 					if (!found.length) return print("no results for: " + args, "err");
@@ -536,7 +638,7 @@
 				async run(args) {
 					if (/^\d+$/.test(args)) {
 						const v = state.view;
-						const t = v && v.kind !== "playlists" && v.items[Number(args) - 1];
+						const t = isSongView(v) && v.items[Number(args) - 1];
 						if (!t) return print("no song " + args + " on screen", "err");
 						await Spicetify.addToQueue([{ uri: t.uri }]);
 						return print("queued: " + describe(t), "acc");
@@ -645,6 +747,112 @@
 					print("unliked: " + describe(t), "dim");
 				},
 			},
+			recent: {
+				desc: "songs and playlists you played lately, then type a number",
+				run() {
+					const list = store("recent") || [];
+					if (!list.length) return print("nothing played yet", "dim");
+					openView("recent", "recent", list);
+				},
+			},
+			random: {
+				desc: "play a random playlist",
+				async run() {
+					const list = (state.playlists || (await loadPlaylists())).filter((p) => !p.liked);
+					if (!list.length) return print("no playlists", "err");
+					const pl = list[Math.floor(Math.random() * list.length)];
+					await Player.playUri(pl.uri);
+					remember({ kind: "playlist", name: pl.name, uri: pl.uri, liked: false });
+					print("playing playlist: " + pl.name, "acc");
+				},
+			},
+			go: {
+				desc: "/go <words> picks the best match in the list on screen",
+				run(args) {
+					const v = state.view;
+					if (!v) return print("no list on screen. try /playlist", "err");
+					if (!args) return print("usage: /go <words>", "err");
+					const hit = matching(v, args)[0];
+					if (!hit) return print("no match for: " + args, "err");
+					return pick(v.items.indexOf(hit) + 1);
+				},
+			},
+			filter: {
+				desc: "/filter <words> keeps only the matching rows of the list on screen",
+				run(args) {
+					const v = state.view;
+					if (!v) return print("no list on screen. try /playlist", "err");
+					if (!args) return print("usage: /filter <words>", "err");
+					const items = matching(v, args);
+					if (!items.length) return print("no match for: " + args, "err");
+					openView(v.kind, "filter: " + args + " in " + v.title, items, v.uri);
+				},
+			},
+			about: {
+				desc: "version and keys",
+				run() {
+					print("ttyfy " + VERSION, "acc");
+					print("  Ctrl+` shows or hides this terminal, /gui does the same");
+					print("  Tab completes, Up and Down bring back commands, ; chains commands");
+					print("  unofficial, not made by Spotify", "dim");
+				},
+			},
+			debug: {
+				desc: "/debug lists which Spicetify features exist, /debug live also tries them",
+				async run(args) {
+					const S = Spicetify;
+					const P = S.Platform || {};
+					const L = P.LibraryAPI;
+					const has = (label, ok) => print((ok ? "ok      " : "MISSING ") + label, ok ? "" : "err");
+					print("features:", "acc");
+					has("Player.playUri", !!Player.playUri);
+					has("Player.setShuffle, setRepeat, seek", !!(Player.setShuffle && Player.setRepeat && Player.seek));
+					has("Platform.RootlistAPI (playlists)", !!(P.RootlistAPI && P.RootlistAPI.getContents));
+					has("Platform.PlaylistAPI (playlist songs)", !!(P.PlaylistAPI && P.PlaylistAPI.getContents));
+					has("Platform.LibraryAPI getTracks, add, remove", !!(L && L.getTracks && L.add && L.remove));
+					has("Platform.PlayerAPI.getQueue", !!(P.PlayerAPI && P.PlayerAPI.getQueue));
+					has("addToQueue", !!S.addToQueue);
+					has("GraphQL album query", !!(S.GraphQL && S.GraphQL.Request && S.GraphQL.Definitions && S.GraphQL.Definitions.queryAlbumTracks));
+					has("GraphQL artist query", !!(S.GraphQL && S.GraphQL.Request && S.GraphQL.Definitions && S.GraphQL.Definitions.queryArtistOverview));
+					has("CosmosAsync.get (search)", !!(S.CosmosAsync && S.CosmosAsync.get));
+					has("saved settings (localStorage)", store("debug-probe", 1) === 1);
+					store("debug-probe", null);
+					if (args !== "live") return print("/debug live tries them for real (reads only, changes nothing)", "dim");
+					print("live checks:", "acc");
+					const check = async (label, fn) => {
+						try {
+							const r = await fn();
+							print("ok      " + label + (r ? "  " + r : ""));
+						} catch (e) {
+							print("FAIL    " + label + ": " + errText(e), "err");
+						}
+					};
+					const cur = current();
+					await check("playlists", async () => (await loadPlaylists()).length + " found");
+					await check("playlist songs", async () => {
+						const pl = (state.playlists || []).find((p) => !p.liked);
+						if (!pl) return "skipped: no playlist";
+						return (await P.PlaylistAPI.getContents(pl.uri, { limit: 3 })).items.length + " rows";
+					});
+					await check("liked songs", async () => (await L.getTracks({ limit: 3 })).items.length + " rows");
+					await check("search", async () => (await searchTracks("a", 1)).length + " result");
+					await check("queue", async () => {
+						const q = await P.PlayerAPI.getQueue();
+						return (q.queued || []).length + (q.nextUp || []).length + " items";
+					});
+					await check("album page", async () => {
+						const u = cur && cur.album && cur.album.uri;
+						if (!u) return "skipped: nothing playing";
+						const items = await albumTracks(u);
+						return items.length + " songs via " + state.albumSource;
+					});
+					await check("artist page", async () => {
+						const a = cur && Array.isArray(cur.artists) && cur.artists[0];
+						if (!a || !a.uri) return "skipped: nothing playing";
+						return (await artistTopTracks(a.uri)).items.length + " songs";
+					});
+				},
+			},
 			last: {
 				desc: "reopen the last playlist you opened",
 				run() {
@@ -672,6 +880,7 @@
 			const items = await loadTracks(pl);
 			openView("tracks", pl.name, items, pl.uri);
 			store("last", { name: pl.name, uri: pl.uri, liked: !!pl.liked });
+			remember({ kind: "playlist", name: pl.name, uri: pl.uri, liked: !!pl.liked });
 			if (items.length) await playTrackInView(1);
 		}
 
@@ -691,8 +900,8 @@
 			}
 			const m = /^\/?(\S+)\s*(.*)$/.exec(text);
 			let name = m[1].toLowerCase();
-			name = ALIASES[name] || name;
-			const cmd = commands[name];
+			if (own(ALIASES, name)) name = ALIASES[name];
+			const cmd = own(commands, name) ? commands[name] : null;
 			if (!cmd) return print("command not found: " + m[1] + "  (try /help)", "err");
 			try {
 				await cmd.run(m[2].trim());
@@ -701,6 +910,35 @@
 				console.error("ttyfy", e);
 			}
 			renderBar();
+		}
+
+		// "a; b" runs a, then b.
+		async function runLine(raw) {
+			const parts = raw.split(";").map((p) => p.trim()).filter(Boolean);
+			for (const p of parts) await run(p);
+		}
+
+		// Tab: complete a command name, or an argument for a few commands.
+		function complete() {
+			const raw = input.value.replace(/^\//, "");
+			if (!raw) return;
+			const m = /^(\S+)\s+(.*)$/.exec(raw);
+			if (m) {
+				const key = m[1].toLowerCase();
+				const name = own(ALIASES, key) ? ALIASES[key] : key;
+				let pool = [];
+				if (name === "playlist" && state.playlists) pool = state.playlists.map((p) => p.name);
+				else if (name === "theme") pool = Object.keys(PALETTES).concat("default");
+				else if (name === "help") pool = Object.keys(commands);
+				const want = m[2].toLowerCase();
+				const hits = pool.filter((x) => x.toLowerCase().startsWith(want));
+				if (hits.length === 1) input.value = "/" + m[1] + " " + hits[0];
+				else if (hits.length > 1) print(hits.join("  "), "dim");
+				return;
+			}
+			const hits = Object.keys(commands).filter((k) => k.startsWith(raw.toLowerCase()));
+			if (hits.length === 1) input.value = "/" + hits[0] + " ";
+			else if (hits.length > 1) print(hits.map((h) => "/" + h).join("  "), "dim");
 		}
 
 		// ---------- input ----------
@@ -715,7 +953,7 @@
 					state.hpos = state.history.length;
 				}
 				input.value = "";
-				run(v);
+				runLine(v);
 			} else if (e.key === "ArrowUp") {
 				e.preventDefault();
 				if (state.hpos > 0) input.value = state.history[--state.hpos];
@@ -729,11 +967,7 @@
 				}
 			} else if (e.key === "Tab") {
 				e.preventDefault();
-				const v = input.value.replace(/^\//, "");
-				if (!v || /\s/.test(v)) return;
-				const hits = Object.keys(commands).filter((k) => k.startsWith(v.toLowerCase()));
-				if (hits.length === 1) input.value = "/" + hits[0] + " ";
-				else if (hits.length > 1) print(hits.map((h) => "/" + h).join("  "), "dim");
+				complete();
 			} else if (e.ctrlKey && e.key.toLowerCase() === "l") {
 				e.preventDefault();
 				out.textContent = "";
@@ -772,7 +1006,11 @@
 		if (Player.addEventListener) {
 			Player.addEventListener("songchange", () => {
 				const t = current();
-				if (t) print("now playing: " + describe(t), "dim");
+				if (t) {
+					print("now playing: " + describe(t), "dim");
+					if (t.uri) remember({ kind: "song", name: nameOf(t), uri: t.uri, artists: artistsOf(t) });
+				}
+				refreshMarks();
 				renderBar();
 			});
 			Player.addEventListener("onplaypause", renderBar);

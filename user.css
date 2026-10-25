@@ -359,6 +359,41 @@ html:not(.ttyfy-ready)::before {
   color: var(--tty-accent);
   white-space: pre;
 }
+#ttyfy-inwrap {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+}
+/* Block cursor that follows the text. theme.js adds .ttyfy-fakecaret
+   when it can track the caret, and the native caret hides then. */
+#ttyfy-cursor {
+  display: none;
+  position: absolute;
+  top: 50%;
+  width: 1ch;
+  height: 1.2em;
+  margin-top: -0.6em;
+  background: rgba(var(--tty-rgb-accent), 0.7);
+  pointer-events: none;
+  animation: ttyfy-blink 1.1s steps(1, end) infinite;
+}
+#ttyfy.ttyfy-fakecaret #ttyfy-cursor {
+  display: block;
+}
+#ttyfy.ttyfy-fakecaret #ttyfy-in {
+  caret-color: transparent;
+}
+#ttyfy-in:not(:focus) + #ttyfy-cursor {
+  opacity: 0.35;
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  #ttyfy-cursor {
+    animation: none;
+  }
+}
+
 #ttyfy-in {
   flex: 1 1 auto;
   min-width: 0;
