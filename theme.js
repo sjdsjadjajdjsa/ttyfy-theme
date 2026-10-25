@@ -79,6 +79,7 @@
 	}, 200);
 
 	function start() {
+		if (document.getElementById("ttyfy")) return; // already running
 		const Player = Spicetify.Player;
 		const state = {
 			view: null, // { kind: "playlists" | "tracks" | "search", title, uri, items, shown }

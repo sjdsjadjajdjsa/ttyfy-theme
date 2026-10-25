@@ -52,6 +52,12 @@ To switch scheme, change `green` to `amber`, `white` or `solarized` and run `spi
 
 Not added yet. See `preview.png` for a placeholder.
 
+## Install from the Marketplace
+
+Set `current_theme` to `marketplace`, then install ttyfy from the Themes tab. Manual install and Marketplace install are either/or, pick one. The terminal covers the Marketplace screen, so press Ctrl+` first if you want to uninstall.
+
+`/theme` colors override the Marketplace scheme picker until you run `/theme default`.
+
 ## Notes
 
 This is unofficial and not made by Spotify. The terminal covers Spotify's own screens, so pop-ups such as a login or update window can end up hidden behind it. Use `/gui` to reach them. Spotify changes its interface often, so parts of the theme can break after an update. The few rules that depend on Spotify class names are in one section of `user.css`. The commands use Spicetify's API in `theme.js`, which can also change. If something looks wrong, open an issue.

@@ -2,27 +2,18 @@
   "name": "ttyfy",
   "description": "Turn Spotify into a terminal. Type /playlist, /play, /search. Monospace, black, square 1px borders, classic green by default.",
   "preview": "preview.png",
+  "readme": "README.md",
   "usercss": "user.css",
   "schemes": "color.ini",
+  "include": [
+    "https://raw.githubusercontent.com/sjdsjadjajdjsa/ttyfy-theme/main/theme.js"
+  ],
   "authors": [
     {
-      "name": "sjdsjadjajdjsa",
+      "name": "cj",
       "url": "https://github.com/sjdsjadjajdjsa"
     }
   ],
-  "tags": [
-    "dark",
-    "monospace",
-    "terminal",
-    "cli",
-    "minimal",
-    "green",
-    "amber"
-  ],
-  "branch": "main",
-  "user": "sjdsjadjajdjsa",
-  "repo": "ttyfy-theme",
-  "include": [
-    "https://cdn.jsdelivr.net/gh/sjdsjadjajdjsa/ttyfy-theme@main/theme.js"
-  ]
+  "tags": ["terminal", "monospace", "dark", "cli"],
+  "branch": "main"
 }
