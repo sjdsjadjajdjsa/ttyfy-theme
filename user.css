@@ -297,9 +297,12 @@ html:not(.ttyfy-ready)::before {
    the window buttons, the left padding on Mac for the traffic lights. */
 #ttyfy-head {
   flex: none;
-  height: 32px;
-  display: flex;
-  align-items: center;
+  box-sizing: border-box;
+  height: 33px;
+  line-height: 32px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   padding: 0 140px 0 12px;
   border-bottom: 1px solid var(--tty-line);
   color: var(--tty-dim);
