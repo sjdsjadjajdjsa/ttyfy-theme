@@ -11,7 +11,7 @@
 	const VERSION = "0.1";
 	const PAGE = 15; // rows shown per page in a list
 	const MAX_LINES = 600; // lines kept in the output
-	const ALIASES = { "?": "help", h: "help", n: "next", b: "back", prev: "previous", q: "queue", pl: "playlist", playlists: "playlist", ls: "playlist", s: "search", find: "search", p: "toggle", m: "more", exit: "gui", np: "now" };
+	const ALIASES = { "?": "help", add: "queue", h: "help", n: "next", b: "back", prev: "previous", q: "queue", pl: "playlist", playlists: "playlist", ls: "playlist", s: "search", find: "search", p: "toggle", m: "more", exit: "gui", np: "now" };
 
 	// Same colors as color.ini. Keep the two in sync (see CLAUDE.md).
 	const PALETTES = {
@@ -108,7 +108,12 @@
 		function artistsOf(t) {
 			if (!t) return "";
 			if (Array.isArray(t.artists)) return t.artists.map((a) => a.name).filter(Boolean).join(", ");
-			return typeof t.artists === "string" ? t.artists : "";
+			if (typeof t.artists === "string") return t.artists;
+			return (t.metadata && t.metadata.artist_name) || "";
+		}
+
+		function nameOf(t) {
+			return (t && (t.name || (t.metadata && t.metadata.title))) || "?";
 		}
 
 		function durOf(t) {
@@ -235,7 +240,58 @@
 		async function searchTracks(q, limit) {
 			const url = "https://api.spotify.com/v1/search?type=track&limit=" + limit + "&q=" + encodeURIComponent(q);
 			const res = await Spicetify.CosmosAsync.get(url);
+			if (res && (res.code || res.error)) throw new Error("search failed: " + (res.message || res.error || res.code));
 			return (res && res.tracks && res.tracks.items) || [];
+		}
+
+		// Album and artist pages use Spotify's own GraphQL, like Spicetify's shuffle+ does.
+		async function albumTracks(uri) {
+			try {
+				const { queryAlbumTracks } = Spicetify.GraphQL.Definitions;
+				const items = [];
+				for (let offset = 0; offset < 500; offset += 100) {
+					const { data, errors } = await Spicetify.GraphQL.Request(queryAlbumTracks, { uri, offset, limit: 100 });
+					if (errors) throw new Error(errors[0].message);
+					const page = (data.albumUnion.tracksV2 || data.albumUnion.tracks).items;
+					page.forEach(({ track }) =>
+						items.push({
+							name: track.name,
+							uri: track.uri,
+							uid: track.uid,
+							artists: ((track.artists && track.artists.items) || []).map((a) => ({ uri: a.uri, name: a.profile && a.profile.name })),
+							duration: { milliseconds: track.duration && track.duration.totalMilliseconds },
+							album: { uri },
+						})
+					);
+					if (page.length < 100) break;
+				}
+				return items;
+			} catch (e) {
+				// Fallback: the web API through Spicetify.
+				const id = uri.split(":").pop();
+				const res = await Spicetify.CosmosAsync.get("https://api.spotify.com/v1/albums/" + id + "/tracks?limit=50");
+				if (!res || res.code || res.error) throw new Error("could not load album");
+				return res.items.map((t) => Object.assign({}, t, { album: { uri } }));
+			}
+		}
+
+		async function artistTopTracks(uri) {
+			const { queryArtistOverview } = Spicetify.GraphQL.Definitions;
+			const { data, errors } = await Spicetify.GraphQL.Request(queryArtistOverview, {
+				uri,
+				locale: Spicetify.Locale.getLocale(),
+				includePrerelease: false,
+			});
+			if (errors) throw new Error(errors[0].message);
+			const u = data.artistUnion;
+			const items = u.discography.topTracks.items.map(({ track }) => ({
+				name: track.name,
+				uri: track.uri,
+				artists: ((track.artists && track.artists.items) || []).map((a) => ({ uri: a.uri, name: a.profile && a.profile.name })),
+				duration: { milliseconds: track.duration && track.duration.totalMilliseconds },
+				album: track.albumOfTrack ? { uri: track.albumOfTrack.uri, name: track.albumOfTrack.name } : undefined,
+			}));
+			return { name: u.profile && u.profile.name, items };
 		}
 
 		// ---------- lists ----------
@@ -245,7 +301,7 @@
 			const dur = durOf(t);
 			return (
 				String(n).padStart(width) + (here ? " > " : "   ") +
-				t.name + " - " + artistsOf(t) + (dur ? "  [" + fmtTime(dur) + "]" : "")
+				nameOf(t) + " - " + artistsOf(t) + (dur ? "  [" + fmtTime(dur) + "]" : "")
 			);
 		}
 
@@ -310,24 +366,38 @@
 		}
 
 		function describe(t) {
-			return t.name + " - " + artistsOf(t);
+			return nameOf(t) + " - " + artistsOf(t);
 		}
 
 		async function playTrackInView(n) {
 			const v = state.view;
 			const t = v.items[n - 1];
 			if (!t) return print("no item " + n, "err");
-			if (v.kind === "tracks" && v.uri) {
-				const context = v.uri === "liked" ? "spotify:collection:tracks" : v.uri;
-				try {
-					await Player.playUri(context, {}, { skipTo: { uri: t.uri } });
-				} catch (e) {
-					await Player.playUri(t.uri);
-				}
+			if (v.kind === "tracks" && v.uri === "liked") {
+				// No sure play context for Liked Songs: play the song, queue the next 50.
+				await Player.playUri(t.uri);
+				const rest = v.items.slice(n, n + 50).map((x) => ({ uri: x.uri }));
+				if (rest.length) await Spicetify.addToQueue(rest);
+			} else if (v.kind === "tracks" && v.uri) {
+				const skipTo = t.uid ? { uri: t.uri, uid: t.uid } : { uri: t.uri };
+				await Player.playUri(v.uri, {}, { skipTo });
 			} else {
 				await Player.playUri(t.uri);
 			}
 			print("playing: " + describe(t), "acc");
+		}
+
+		// Item n of the list on screen, or the song that is playing when n is empty.
+		function songFor(args) {
+			if (/^\d+$/.test(args)) {
+				const v = state.view;
+				const t = v && v.kind !== "playlists" && v.items[Number(args) - 1];
+				if (!t) throw new Error("no song " + args + " on screen");
+				return t;
+			}
+			const t = current();
+			if (!t) throw new Error("nothing playing");
+			return t;
 		}
 
 		// ---------- commands ----------
@@ -433,12 +503,47 @@
 				},
 			},
 			queue: {
-				desc: "show what plays next",
-				run() {
-					const next = (Player.data && Player.data.nextItems) || [];
+				desc: "/queue shows what plays next, /queue <number> adds that song from the list",
+				async run(args) {
+					if (/^\d+$/.test(args)) {
+						const v = state.view;
+						const t = v && v.kind !== "playlists" && v.items[Number(args) - 1];
+						if (!t) return print("no song " + args + " on screen", "err");
+						await Spicetify.addToQueue([{ uri: t.uri }]);
+						return print("queued: " + describe(t), "acc");
+					}
+					let next = [];
+					try {
+						const q = await Spicetify.Platform.PlayerAPI.getQueue();
+						next = [].concat(q.queued || [], q.nextUp || []);
+					} catch (e) {
+						next = (Player.data && Player.data.nextItems) || [];
+					}
 					if (!next.length) return print("queue is empty", "dim");
 					print("up next:", "acc");
 					next.slice(0, 10).forEach((t, i) => print(String(i + 1).padStart(2) + "   " + describe(t)));
+				},
+			},
+			album: {
+				desc: "/album shows the album of the playing song, /album <number> uses a song on screen",
+				async run(args) {
+					const t = songFor(args);
+					const uri = t.album && t.album.uri;
+					if (!uri) return print("no album for this song", "err");
+					print("loading...", "dim");
+					const items = await albumTracks(uri);
+					openView("tracks", "album: " + ((t.album && t.album.name) || nameOf(t)), items, uri);
+				},
+			},
+			artist: {
+				desc: "/artist shows top songs of the playing artist, /artist <number> uses a song on screen",
+				async run(args) {
+					const t = songFor(args);
+					const a = Array.isArray(t.artists) && t.artists[0];
+					if (!a || !a.uri) return print("no artist for this song", "err");
+					print("loading...", "dim");
+					const r = await artistTopTracks(a.uri);
+					openView("tracks", "artist: " + (r.name || a.name), r.items, null);
 				},
 			},
 			vol: {
@@ -488,19 +593,19 @@
 			like: {
 				desc: "save the current song to Liked Songs",
 				async run() {
-					const id = trackId();
-					if (!id) return print("nothing playing", "err");
-					await Spicetify.CosmosAsync.put("https://api.spotify.com/v1/me/tracks?ids=" + id);
-					print("liked: " + describe(current()), "acc");
+					const t = current();
+					if (!t) return print("nothing playing", "err");
+					await Spicetify.Platform.LibraryAPI.add({ uris: [t.uri] });
+					print("liked: " + describe(t), "acc");
 				},
 			},
 			unlike: {
 				desc: "remove the current song from Liked Songs",
 				async run() {
-					const id = trackId();
-					if (!id) return print("nothing playing", "err");
-					await Spicetify.CosmosAsync.del("https://api.spotify.com/v1/me/tracks?ids=" + id);
-					print("unliked: " + describe(current()), "dim");
+					const t = current();
+					if (!t) return print("nothing playing", "err");
+					await Spicetify.Platform.LibraryAPI.remove({ uris: [t.uri] });
+					print("unliked: " + describe(t), "dim");
 				},
 			},
 			last: {
@@ -525,12 +630,6 @@
 			bar: { desc: "show or hide the status bar", run: toggleBar },
 			gui: { desc: "hide the terminal and show normal Spotify (Ctrl+` brings it back)", run: () => setGui(true) },
 		};
-
-		function trackId() {
-			const t = current();
-			const m = t && /^spotify:track:(\w+)$/.exec(t.uri);
-			return m ? m[1] : null;
-		}
 
 		async function openPlaylistAndPlay(pl) {
 			const items = await loadTracks(pl);
