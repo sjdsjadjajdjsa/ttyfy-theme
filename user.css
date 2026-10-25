@@ -365,15 +365,22 @@ html:not(.ttyfy-ready)::before {
 #ttyfy-cava {
   flex: none;
   box-sizing: border-box;
+  display: flex;
+  align-items: flex-end;
+  gap: 1ch;
   padding: 4px 12px;
-  border-top: 1px solid var(--tty-line);
   color: var(--tty-accent);
-  white-space: pre;
   overflow: hidden;
-  line-height: 1;
 }
 #ttyfy-cava[hidden] {
   display: none;
+}
+/* One bar. Height is set by theme.js, the 2px minimum is the thin baseline when quiet. */
+#ttyfy-cava .ty-cavabar {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 2px;
+  background: var(--tty-accent);
 }
 /* Hidden strip of text, only used to measure the width of one character. */
 #ttyfy-ruler {

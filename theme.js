@@ -333,7 +333,6 @@
 		// stored analysis (loudness, beats and notes per slice), played back in time
 		// with the song. They follow the music but are not a live spectrum.
 
-		const BLOCKS = ["\u2581", "\u2582", "\u2583", "\u2584", "\u2585", "\u2586", "\u2587", "\u2588"];
 		const clamp = (x, lo, hi) => Math.min(hi, Math.max(lo, x));
 		const lerp = (a, b, k) => a + (b - a) * k;
 
@@ -413,7 +412,7 @@
 			return out;
 		}
 
-		// How many bars fit: three characters each (two wide, one gap), unless set by hand.
+		// How many bars fit: three characters each (a bar and a gap), unless set by hand.
 		function cavaCount() {
 			const c = state.cava;
 			if (c.bars !== "auto") return c.bars;
@@ -422,31 +421,25 @@
 			return clamp(Math.floor((cols + 1) / 3), 8, 64);
 		}
 
+		// The bars are solid blocks (not text), so there are no seams between them.
 		function cavaTick() {
 			const c = state.cava;
 			if (root.classList.contains("ttyfy-hidden")) return; // nothing to draw while hidden
 			try {
 				const n = cavaCount();
 				const target = Player.isPlaying() ? cavaLevels(n, Player.getProgress() / 1000) : new Array(n).fill(0);
-				if (c.vals.length !== n) c.vals = new Array(n).fill(0);
+				if (c.vals.length !== n || cavaEl.children.length !== n) {
+					c.vals = new Array(n).fill(0);
+					cavaEl.textContent = "";
+					for (let k = 0; k < n; k++) cavaEl.appendChild(el("span", "", "ty-cavabar"));
+				}
+				cavaEl.style.height = c.rows * 1.3 + "em";
 				// Rise fast, fall slowly, like cava.
 				c.vals = c.vals.map((v, k) => (target[k] > v ? v + (target[k] - v) * 0.6 : v * 0.88));
-				const rows = c.rows;
-				const lines = [];
-				for (let r = 0; r < rows; r++) {
-					let line = "";
-					for (let k = 0; k < n; k++) {
-						const h = Math.round(c.vals[k] * rows * 8);
-						let lvl = clamp(h - (rows - 1 - r) * 8, 0, 8);
-						if (r === rows - 1) lvl = Math.max(1, lvl); // a thin baseline when quiet
-						const ch = lvl ? BLOCKS[lvl - 1] : " ";
-						line += ch + ch + (k < n - 1 ? " " : "");
-					}
-					lines.push(line);
-				}
-				cavaEl.textContent = lines.join("\n");
+				for (let k = 0; k < n; k++) cavaEl.children[k].style.height = clamp(c.vals[k], 0, 1) * 100 + "%";
 			} catch (e) {
 				cavaEl.textContent = "cava error: " + errText(e);
+				c.vals = [];
 			}
 		}
 
