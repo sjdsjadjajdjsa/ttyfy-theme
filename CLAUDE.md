@@ -33,7 +33,7 @@ There is no build and Spotify cannot run in CI, so test by hand:
 3. For faster edits: `spicetify watch -s` reloads on every save.
 4. Use `spicetify enable-devtool` and Ctrl+Shift+I in Spotify to inspect elements.
 5. Check each scheme in the terminal and, after `/gui`, in normal Spotify: home, a playlist, search, player bar, a context menu, the right sidebar.
-6. Try every command in the README table.
+6. Try every command in the README table. `/debug live` shows which Spicetify features work in the Spotify you run.
 7. Check `manifest.json` is valid JSON.
 
 To try theme.js without Spotify, load it in a plain HTML page with a fake `Spicetify` object (Playwright works).

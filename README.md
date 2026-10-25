@@ -21,13 +21,15 @@ Start with these:
 | --- | --- |
 | `/playlist` | list your playlists (Liked Songs is first), then type a number to open one |
 | `/search words` | list songs, then type a number to play one |
+| `/go words` | jump to the best match in the list on screen |
+| `/recent` | songs and playlists you played lately |
 | `/play words` | play the first match |
 | `/pause`, `/resume` | control playback |
 | `/next`, `/previous` | skip |
-| `/now` | the current song |
-| `/help` | this short list. `/help all` shows every command |
+| `/now` | the current song, with progress |
+| `/help` | this short list. `/help all` shows every command, `/help play` explains one |
 
-When a list is on screen, just type its number. In a playlist list it opens that playlist, in a song list it plays that song. `/back` goes back to the last list. Lists show 15 rows at a time, `/more` shows the next 15. While a playlist is open, `/play` with a few words plays the matching song from it.
+When a list is on screen, just type its number. In a playlist list it opens that playlist, in a song list it plays that song. `/back` goes back to the last list. Lists fit your window, `/more` shows the next page. `/filter words` keeps only the matching rows of a long list. While a playlist is open, `/play` with a few words plays the matching song from it.
 
 Find more of the same:
 
@@ -38,12 +40,15 @@ Find more of the same:
 | `/queue` | what plays next |
 | `/queue 3` | add song 3 on screen to the queue |
 | `/last` | reopen the last playlist you opened |
+| `/random` | play a random playlist |
 
-The rest: `/toggle`, `/vol 40`, `/vol +10`, `/seek 1:30`, `/seek +10`, `/shuffle` (or `/shuffle on`, `/shuffle off`), `/repeat`, `/like`, `/unlike`, `/theme amber` (colors: green, amber, white, solarized, default), `/bar` (a one-line player bar at the bottom, off by default), `/clear`, `/gui`.
+The rest: `/toggle`, `/vol 40`, `/vol +10`, `/seek 1:30`, `/seek +10`, `/shuffle` (or `/shuffle on`, `/shuffle off`), `/repeat`, `/like`, `/unlike`, `/theme amber` (colors: green, amber, white, solarized, default), `/bar` (a one-line player bar at the bottom, off by default), `/clear`, `/about`, `/gui`.
+
+Tab completes commands, playlist names (`/playlist road` then Tab) and color names. Up and down arrows bring back old commands. A semicolon chains commands: `/vol 30; /next`.
 
 On start the terminal opens on your playlists, so you can type a number right away.
 
-Tab completes a command. Up and down arrows bring back old commands.
+If something does not work, run `/debug live`. It checks which Spicetify features your Spotify version has and tries each one without changing anything. Send the output with your bug report.
 
 ## Install
 
