@@ -9,9 +9,9 @@
 	"use strict";
 
 	const VERSION = "0.1";
-	const PAGE = 40; // rows shown per page in a list
+	const PAGE = 15; // rows shown per page in a list
 	const MAX_LINES = 600; // lines kept in the output
-	const ALIASES = { "?": "help", h: "help", n: "next", b: "prev", back: "prev", q: "queue", pl: "playlist", s: "search", p: "toggle", exit: "gui", np: "now" };
+	const ALIASES = { "?": "help", h: "help", n: "next", b: "back", prev: "previous", q: "queue", pl: "playlist", playlists: "playlist", ls: "playlist", s: "search", find: "search", p: "toggle", m: "more", exit: "gui", np: "now" };
 
 	function ready() {
 		return (
@@ -44,6 +44,7 @@
 		const state = {
 			view: null, // { kind: "playlists" | "tracks" | "search", title, uri, items, shown }
 			playlists: null, // cached list of the user's playlists
+			stack: [], // lists you came from, for /back
 			history: [],
 			hpos: 0,
 			bar: false,
@@ -115,6 +116,11 @@
 
 		function printAll(lines, cls) {
 			lines.forEach((l) => print(l, cls));
+		}
+
+		function setTitle() {
+			const v = state.view;
+			head.textContent = "ttyfy " + VERSION + (v ? "  /  " + v.title : "");
 		}
 
 		function setGui(showGui) {
@@ -214,18 +220,50 @@
 				else print(trackLine(it, i + 1, width), current() && current().uri === it.uri ? "acc" : "");
 			}
 			v.shown = end;
-			if (end < v.items.length) print("-- " + (v.items.length - end) + " more, type /more --", "dim");
+			const more = v.items.length - end;
+			const action = v.kind === "playlists" ? "open" : "play";
+			print(
+				(more ? more + " more: /more.  " : "") + "type a number to " + action + (state.stack.length ? ".  /back to go back" : ""),
+				"dim"
+			);
 		}
 
-		function openView(kind, title, items, uri) {
-			state.view = { kind, title, items, uri, shown: 0 };
-			print(title + " (" + items.length + ")", "acc");
-			if (!items.length) print("empty", "dim");
+		// Clears the screen and draws a list from the top, so lists never pile up.
+		function render(v) {
+			out.textContent = "";
+			setTitle();
+			print(v.title + " (" + v.items.length + ")", "acc");
+			if (!v.items.length) print("empty", "dim");
 			showPage();
 		}
 
+		function openView(kind, title, items, uri) {
+			if (state.view) state.stack.push(state.view);
+			if (state.stack.length > 5) state.stack.shift();
+			state.view = { kind, title, items, uri, shown: 0 };
+			render(state.view);
+		}
+
+		function back() {
+			const v = state.stack.pop();
+			if (!v) return print("nothing to go back to", "dim");
+			v.shown = 0;
+			state.view = v;
+			render(v);
+		}
+
+		// A bare number picks an item from the list on screen.
+		async function pick(n) {
+			const v = state.view;
+			if (!v) return print("no list on screen. try /playlist", "err");
+			const it = v.items[n - 1];
+			if (!it) return print("no item " + n + " (1-" + v.items.length + ")", "err");
+			if (v.kind === "playlists") return openPlaylist(it);
+			return playTrackInView(n);
+		}
+
 		async function openPlaylist(pl) {
-			print("loading " + pl.name + "...", "dim");
+			print("loading...", "dim");
 			const items = await loadTracks(pl);
 			openView("tracks", pl.name, items, pl.uri);
 		}
@@ -255,15 +293,25 @@
 
 		const commands = {
 			help: {
-				desc: "show this list",
-				run() {
-					print("commands:", "acc");
-					Object.keys(commands).forEach((k) => print("  /" + k.padEnd(10) + commands[k].desc));
-					print("tip: after /playlist or /search, use /play <number>. Tab completes. Up/Down for history.", "dim");
+				desc: "short list of commands, /help all shows every one",
+				run(args) {
+					print("start here:", "acc");
+					print("  /playlist     browse your playlists, then type a number");
+					print("  /search words find a song, then type a number");
+					print("  /play words   play the first match");
+					print("  /pause  /resume  /next  /previous");
+					print("  /now          what is playing");
+					print("  /help all     every command");
+					if (args !== "all") return;
+					print("more:", "acc");
+					Object.keys(commands)
+						.filter((k) => !commands[k].core)
+						.forEach((k) => print("  /" + k.padEnd(10) + commands[k].desc));
 				},
 			},
 			clear: { desc: "clear the screen", run: () => (out.textContent = "") },
 			now: {
+				core: true,
 				desc: "show the current song",
 				run() {
 					const t = current();
@@ -274,7 +322,8 @@
 				},
 			},
 			play: {
-				desc: "/play resumes, /play <n> plays item n, /play <words> searches and plays",
+				core: true,
+				desc: "/play resumes, /play <number> plays that item, /play <words> plays a match",
 				async run(args) {
 					if (!args) return Player.play();
 					const v = state.view;
@@ -289,19 +338,27 @@
 						}
 						return playTrackInView(n);
 					}
+					// In an open list, words match a song in that list first.
+					if (v && v.kind !== "playlists") {
+						const q = args.toLowerCase();
+						const i = v.items.findIndex((t) => (t.name + " " + artistsOf(t)).toLowerCase().includes(q));
+						if (i >= 0) return playTrackInView(i + 1);
+					}
 					const found = await searchTracks(args, 1);
 					if (!found.length) return print("no results for: " + args, "err");
 					await Player.playUri(found[0].uri);
 					print("playing: " + describe(found[0]), "acc");
 				},
 			},
-			pause: { desc: "pause", run: () => Player.pause() },
-			resume: { desc: "resume", run: () => Player.play() },
-			toggle: { desc: "pause or resume", run: () => Player.togglePlay() },
-			next: { desc: "next song", run: () => Player.next() },
-			prev: { desc: "previous song (or restart this one)", run: () => Player.back() },
+			pause: { core: true, desc: "pause", run: () => Player.pause() },
+			resume: { core: true, desc: "resume", run: () => Player.play() },
+			toggle: { desc: "pause or resume (alias /p)", run: () => Player.togglePlay() },
+			next: { core: true, desc: "next song (alias /n)", run: () => Player.next() },
+			previous: { core: true, desc: "previous song, or restart this one (alias /prev)", run: () => Player.back() },
+			back: { desc: "go back to the previous list (alias /b)", run: back },
 			playlist: {
-				desc: "/playlist lists, /playlist <n or name> opens one",
+				core: true,
+				desc: "/playlist lists, /playlist <number or name> opens one",
 				async run(args) {
 					if (!args) {
 						const list = await loadPlaylists();
@@ -319,7 +376,8 @@
 				},
 			},
 			search: {
-				desc: "/search <words> lists songs, then /play <n>",
+				core: true,
+				desc: "/search <words> lists songs, then type a number",
 				async run(args) {
 					if (!args) return print("usage: /search <words>", "err");
 					const found = await searchTracks(args, 20);
@@ -327,7 +385,7 @@
 				},
 			},
 			more: {
-				desc: "show the next page of a list",
+				desc: "next page of a list (alias /m)",
 				run() {
 					if (!state.view || state.view.shown >= state.view.items.length) return print("nothing more", "dim");
 					showPage();
@@ -422,6 +480,15 @@
 			const text = raw.trim();
 			if (!text) return;
 			print("ttyfy> " + text, "echo");
+			if (/^\d+$/.test(text)) {
+				try {
+					await pick(Number(text));
+				} catch (e) {
+					print("error: " + (e && e.message ? e.message : String(e)), "err");
+					console.error("ttyfy", e);
+				}
+				return renderBar();
+			}
 			const m = /^\/?(\S+)\s*(.*)$/.exec(text);
 			let name = m[1].toLowerCase();
 			name = ALIASES[name] || name;
@@ -497,9 +564,12 @@
 
 		// ---------- hello ----------
 
-		print("ttyfy " + VERSION + "  type /help for commands", "acc");
+		print("ttyfy " + VERSION, "acc");
 		const t = current();
 		if (t) print((Player.isPlaying() ? "playing: " : "paused:  ") + describe(t), "dim");
+		print("/playlist to browse, /search words to find a song, /help for more", "dim");
+		setTitle();
+		document.documentElement.classList.add("ttyfy-ready");
 		input.focus();
 	}
 })();
