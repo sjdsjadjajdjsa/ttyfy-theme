@@ -13,6 +13,42 @@
 	const MAX_LINES = 600; // lines kept in the output
 	const ALIASES = { "?": "help", h: "help", n: "next", b: "back", prev: "previous", q: "queue", pl: "playlist", playlists: "playlist", ls: "playlist", s: "search", find: "search", p: "toggle", m: "more", exit: "gui", np: "now" };
 
+	// Same colors as color.ini. Keep the two in sync (see CLAUDE.md).
+	const PALETTES = {
+		green: { text: "33ff33", subtext: "22aa22", main: "000000", sidebar: "000000", player: "000000", card: "061006", button: "33ff33", "button-active": "99ff99", "button-disabled": "145214", "tab-active": "0b2a0b", notification: "0b2a0b", "notification-error": "ff4040", "selected-row": "66ff66", misc: "1c5c1c" },
+		amber: { text: "ffb000", subtext: "b37a00", main: "000000", sidebar: "000000", player: "000000", card: "140e00", button: "ffb000", "button-active": "ffd36b", "button-disabled": "5c4000", "tab-active": "2a1d00", notification: "2a1d00", "notification-error": "ff4040", "selected-row": "ffcc55", misc: "664600" },
+		white: { text: "e6e6e6", subtext: "9a9a9a", main: "000000", sidebar: "000000", player: "000000", card: "0f0f0f", button: "ffffff", "button-active": "cccccc", "button-disabled": "4d4d4d", "tab-active": "1f1f1f", notification: "1f1f1f", "notification-error": "ff5555", "selected-row": "ffffff", misc: "555555" },
+		solarized: { text: "93a1a1", subtext: "657b83", main: "002b36", sidebar: "002b36", player: "002b36", card: "073642", button: "2aa198", "button-active": "35c4b9", "button-disabled": "586e75", "tab-active": "073642", notification: "073642", "notification-error": "dc322f", "selected-row": "eee8d5", misc: "586e75" },
+	};
+
+	// localStorage can be missing or blocked, so every use is wrapped.
+	function store(key, value) {
+		try {
+			if (value === undefined) return JSON.parse(localStorage.getItem("ttyfy." + key));
+			if (value === null) localStorage.removeItem("ttyfy." + key);
+			else localStorage.setItem("ttyfy." + key, JSON.stringify(value));
+		} catch (e) {
+			return null;
+		}
+		return value;
+	}
+
+	function applyPalette(name) {
+		const style = document.documentElement.style;
+		const keys = Object.keys(PALETTES.green);
+		keys.forEach((k) => {
+			style.removeProperty("--spice-" + k);
+			style.removeProperty("--spice-rgb-" + k);
+		});
+		const p = PALETTES[name];
+		if (!p) return;
+		keys.forEach((k) => {
+			const hex = p[k];
+			style.setProperty("--spice-" + k, "#" + hex);
+			style.setProperty("--spice-rgb-" + k, [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(","));
+		});
+	}
+
 	function ready() {
 		return (
 			document.body &&
@@ -23,6 +59,9 @@
 			Spicetify.CosmosAsync
 		);
 	}
+
+	const savedTheme = store("theme");
+	if (savedTheme) applyPalette(savedTheme);
 
 	let tries = 0;
 	const wait = setInterval(() => {
@@ -266,6 +305,7 @@
 			print("loading...", "dim");
 			const items = await loadTracks(pl);
 			openView("tracks", pl.name, items, pl.uri);
+			store("last", { name: pl.name, uri: pl.uri, liked: !!pl.liked });
 		}
 
 		function describe(t) {
@@ -429,9 +469,11 @@
 				},
 			},
 			shuffle: {
-				desc: "toggle shuffle",
-				run() {
-					Player.toggleShuffle();
+				desc: "/shuffle toggles, /shuffle on or /shuffle off sets it",
+				run(args) {
+					const want = args.toLowerCase();
+					if (want === "on" || want === "off") Player.setShuffle(want === "on");
+					else Player.toggleShuffle();
 					print("shuffle: " + (Player.getShuffle() ? "on" : "off"));
 				},
 			},
@@ -458,6 +500,25 @@
 					if (!id) return print("nothing playing", "err");
 					await Spicetify.CosmosAsync.del("https://api.spotify.com/v1/me/tracks?ids=" + id);
 					print("unliked: " + describe(current()), "dim");
+				},
+			},
+			last: {
+				desc: "reopen the last playlist you opened",
+				run() {
+					const pl = store("last");
+					if (!pl) return print("no playlist opened yet. try /playlist", "dim");
+					return openPlaylist(pl);
+				},
+			},
+			theme: {
+				desc: "/theme lists colors, /theme amber changes them (green, amber, white, solarized, default)",
+				run(args) {
+					const name = args.toLowerCase();
+					if (!name) return print("colors: " + Object.keys(PALETTES).join(", ") + ", default  (now: " + (store("theme") || "default") + ")");
+					if (name !== "default" && !PALETTES[name]) return print("no color scheme: " + args, "err");
+					applyPalette(name === "default" ? null : name);
+					store("theme", name === "default" ? null : name);
+					print("colors: " + name, "acc");
 				},
 			},
 			bar: { desc: "show or hide the status bar", run: toggleBar },
@@ -564,12 +625,27 @@
 
 		// ---------- hello ----------
 
-		print("ttyfy " + VERSION, "acc");
-		const t = current();
-		if (t) print((Player.isPlaying() ? "playing: " : "paused:  ") + describe(t), "dim");
-		print("/playlist to browse, /search words to find a song, /help for more", "dim");
 		setTitle();
 		document.documentElement.classList.add("ttyfy-ready");
+
+		function welcome() {
+			const t = current();
+			if (t) print((Player.isPlaying() ? "playing: " : "paused:  ") + describe(t), "dim");
+			const last = store("last");
+			if (last) print("last: " + last.name + "  (/last to reopen)", "dim");
+		}
+
+		// Open on your playlists, so typing a number is the first thing you can do.
+		print("ttyfy " + VERSION, "acc");
+		loadPlaylists()
+			.then((list) => {
+				openView("playlists", "playlists", list);
+				welcome();
+			})
+			.catch(() => {
+				welcome();
+				print("/playlist to browse, /search words to find a song, /help for more", "dim");
+			});
 		input.focus();
 	}
 })();
