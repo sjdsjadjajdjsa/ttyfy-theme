@@ -1,0 +1,17 @@
+{
+  "name": "ttyfy",
+  "description": "Make Spotify look like a terminal. Monospace font, black background, square 1px borders, classic green by default.",
+  "preview": "preview.png",
+  "usercss": "user.css",
+  "schemes": "color.ini",
+  "authors": [
+    {
+      "name": "sjdsjadjajdjsa",
+      "url": "https://github.com/sjdsjadjajdjsa"
+    }
+  ],
+  "tags": ["dark", "monospace", "terminal", "minimal", "green", "amber"],
+  "branch": "main",
+  "user": "sjdsjadjajdjsa",
+  "repo": "ttyfy-theme"
+}
