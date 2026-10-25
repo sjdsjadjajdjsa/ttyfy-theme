@@ -42,9 +42,9 @@ Find more of the same:
 | `/last` | reopen the last playlist you opened |
 | `/random` | play a random playlist |
 
-The rest: `/toggle`, `/vol 40`, `/vol +10`, `/seek 1:30`, `/seek +10`, `/shuffle` (or `/shuffle on`, `/shuffle off`), `/repeat`, `/like`, `/unlike`, `/theme amber` (colors: green, amber, white, solarized, default), `/bar` (a one-line player bar at the bottom, off by default), `/clear`, `/about`, `/gui`.
+The rest: `/toggle`, `/vol 40`, `/vol +10`, `/seek 1:30`, `/seek +10`, `/shuffle` (or `/shuffle on`, `/shuffle off`), `/repeat` (or `/repeat off`, `/repeat all`, `/repeat one`), `/like`, `/unlike`, `/theme amber` (colors: green, amber, white, solarized, default), `/bar` (a one-line player bar at the bottom, off by default), `/clear`, `/about`, `/gui`.
 
-Tab completes commands, playlist names (`/playlist road` then Tab) and color names. Up and down arrows bring back old commands. A semicolon chains commands: `/vol 30; /next`.
+Tab completes commands, playlist names (`/playlist road` then Tab) and color names. Up and down arrows bring back old commands. A semicolon before a `/command` chains commands: `/vol 30; /next`. PageUp and PageDown scroll the screen.
 
 On start the terminal opens on your playlists, so you can type a number right away.
 

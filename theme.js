@@ -18,7 +18,7 @@
 		green: { text: "33ff33", subtext: "22aa22", main: "000000", sidebar: "000000", player: "000000", card: "061006", button: "33ff33", "button-active": "99ff99", "button-disabled": "145214", "tab-active": "0b2a0b", notification: "0b2a0b", "notification-error": "ff4040", "selected-row": "66ff66", misc: "1c5c1c" },
 		amber: { text: "ffb000", subtext: "b37a00", main: "000000", sidebar: "000000", player: "000000", card: "140e00", button: "ffb000", "button-active": "ffd36b", "button-disabled": "5c4000", "tab-active": "2a1d00", notification: "2a1d00", "notification-error": "ff4040", "selected-row": "ffcc55", misc: "664600" },
 		white: { text: "e6e6e6", subtext: "9a9a9a", main: "000000", sidebar: "000000", player: "000000", card: "0f0f0f", button: "ffffff", "button-active": "cccccc", "button-disabled": "4d4d4d", "tab-active": "1f1f1f", notification: "1f1f1f", "notification-error": "ff5555", "selected-row": "ffffff", misc: "555555" },
-		solarized: { text: "93a1a1", subtext: "657b83", main: "002b36", sidebar: "002b36", player: "002b36", card: "073642", button: "2aa198", "button-active": "35c4b9", "button-disabled": "586e75", "tab-active": "073642", notification: "073642", "notification-error": "dc322f", "selected-row": "eee8d5", misc: "586e75" },
+		solarized: { text: "93a1a1", subtext: "839496", main: "002b36", sidebar: "002b36", player: "002b36", card: "073642", button: "2aa198", "button-active": "35c4b9", "button-disabled": "586e75", "tab-active": "073642", notification: "073642","notification-error": "f0605d", "selected-row": "eee8d5", misc: "586e75" },
 	};
 
 	// localStorage can be missing or blocked, so every use is wrapped.
@@ -50,8 +50,18 @@
 			(e.error && e.error.message) ||
 			(typeof e.error === "string" ? e.error : "") ||
 			(e.code ? String(e.code) : "");
-		const msg = text || JSON.stringify(e);
-		return e instanceof TypeError ? "not supported by this Spotify version (" + msg + ")" : msg;
+		let msg = text;
+		if (!msg) {
+			try {
+				msg = JSON.stringify(e);
+			} catch (x) {
+				msg = "";
+			}
+		}
+		if (!msg || msg === "{}") msg = "unknown error";
+		// Only calls that came back undefined mean "this Spotify version lacks it".
+		const missing = /undefined|null|is not a function|is not defined|not iterable/.test(msg);
+		return e instanceof TypeError && missing ? "not supported by this Spotify version (" + msg + ")" : msg;
 	}
 
 	function applyPalette(name) {
@@ -80,8 +90,9 @@
 		);
 	}
 
-	const savedTheme = store("theme");
-	if (savedTheme) applyPalette(savedTheme);
+	let theme = store("theme");
+	if (theme && !hasPalette(theme)) theme = null;
+	if (theme) applyPalette(theme);
 
 	let tries = 0;
 	const wait = setInterval(() => {
@@ -108,6 +119,10 @@
 			playlists: null, // cached list of the user's playlists
 			stack: [], // lists you came from, for /back
 			rows: [], // song rows on screen, so the playing one can be marked
+			nav: 0, // bumps whenever the screen changes list, so a slow load cannot replace a newer one
+			ran: false, // true once the user ran a command
+			ours: [], // song uris this terminal put in the queue
+			draft: "", // what you were typing before browsing history
 			history: [],
 			hpos: 0,
 			bar: false,
@@ -159,11 +174,28 @@
 			return !!v && (v.kind === "tracks" || v.kind === "search");
 		}
 
-		// Remember songs and playlists for /recent (newest first, 10 kept).
+		// Song n of the list on screen (also song rows in /recent), or null.
+		function songAt(n) {
+			const v = state.view;
+			if (!v) return null;
+			const it = v.items[n - 1];
+			if (!it) return null;
+			if (isSongView(v)) return it;
+			return v.kind === "recent" && it.kind === "song" ? it : null;
+		}
+
+		// Remember songs and playlists for /recent (newest first, 7 of each kept).
 		function remember(entry) {
 			const list = (store("recent") || []).filter((r) => r.uri !== entry.uri);
 			list.unshift(entry);
-			store("recent", list.slice(0, 10));
+			const seen = { song: 0, playlist: 0 };
+			store("recent", list.filter((r) => ++seen[r.kind === "playlist" ? "playlist" : "song"] <= 7));
+		}
+
+		// One song label: "Name - Artist", or just the name when there is no artist.
+		function label(t) {
+			const a = artistsOf(t);
+			return nameOf(t) + (a ? " - " + a : "");
 		}
 
 		// ---------- page ----------
@@ -177,6 +209,9 @@
 		const input = el("input", "ttyfy-in");
 		const inwrap = el("div", "ttyfy-inwrap");
 		const cursor = el("span", "ttyfy-cursor");
+		const mirror = el("span", "ttyfy-mirror");
+		const barTitle = el("span", "ttyfy-bartitle");
+		const barInfo = el("span", "ttyfy-barinfo");
 
 		head.textContent = "ttyfy " + VERSION;
 		bar.hidden = true;
@@ -188,7 +223,8 @@
 		input.setAttribute("aria-label", "command line");
 		if (/Mac/i.test(navigator.platform || "")) root.classList.add("ttyfy-mac");
 
-		inwrap.append(input, cursor);
+		bar.append(barTitle, barInfo);
+		inwrap.append(input, cursor, mirror);
 		prompt.append(ps, inwrap);
 		root.append(head, out, bar, prompt);
 		document.body.appendChild(root);
@@ -217,8 +253,11 @@
 
 		// Our own blinking block cursor. The native caret comes back when the text scrolls.
 		function updateCursor() {
-			root.classList.toggle("ttyfy-fakecaret", input.scrollLeft === 0);
-			cursor.style.left = (input.selectionStart || 0) + "ch";
+			mirror.textContent = input.value.slice(0, input.selectionStart || 0);
+			const x = mirror.offsetWidth - input.scrollLeft;
+			const fits = x >= 0 && x < input.clientWidth - 2;
+			root.classList.toggle("ttyfy-fakecaret", fits);
+			cursor.style.left = x + "px";
 		}
 		["input", "keydown", "keyup", "click", "focus", "select", "mouseup"].forEach((ev) =>
 			input.addEventListener(ev, () => requestAnimationFrame(updateCursor))
@@ -231,7 +270,11 @@
 
 		function setGui(showGui) {
 			root.classList.toggle("ttyfy-hidden", showGui);
-			if (!showGui) input.focus();
+			if (!showGui) {
+				out.scrollTop = out.scrollHeight;
+				input.focus();
+				updateCursor();
+			}
 		}
 
 		function toggleGui() {
@@ -242,24 +285,29 @@
 
 		function renderBar() {
 			if (!state.bar) return;
-			const t = current();
-			if (!t) {
-				bar.textContent = "[--] nothing playing";
-				return;
+			try {
+				const t = current();
+				if (!t) {
+					barTitle.textContent = "[--] nothing playing";
+					barInfo.textContent = "";
+					return;
+				}
+				const dur = Player.getDuration() || durOf(t);
+				const pos = Player.getProgress();
+				const width = 20;
+				const filled = dur ? Math.min(width, Math.round((pos / dur) * width)) : 0;
+				const meter = "#".repeat(filled) + "-".repeat(width - filled);
+				const rep = ["off", "all", "one"][Player.getRepeat()] || "off";
+				barTitle.textContent = (Player.isPlaying() ? "[>] " : "[||] ") + label(t);
+				barInfo.textContent =
+					"  " + fmtTime(pos) + "/" + fmtTime(dur) +
+					"  [" + meter + "]  vol " + Math.round(Player.getVolume() * 100) +
+					"  shuf " + (Player.getShuffle() ? "on" : "off") +
+					"  rep " + rep;
+			} catch (e) {
+				barTitle.textContent = "[--] status bar error: " + errText(e);
+				barInfo.textContent = "";
 			}
-			const dur = Player.getDuration() || durOf(t);
-			const pos = Player.getProgress();
-			const width = 20;
-			const filled = dur ? Math.min(width, Math.round((pos / dur) * width)) : 0;
-			const meter = "#".repeat(filled) + "-".repeat(width - filled);
-			const rep = ["off", "all", "one"][Player.getRepeat()] || "off";
-			bar.textContent =
-				(Player.isPlaying() ? "[>] " : "[||] ") +
-				nameOf(t) + " - " + artistsOf(t) +
-				"  " + fmtTime(pos) + "/" + fmtTime(dur) +
-				"  [" + meter + "]  vol " + Math.round(Player.getVolume() * 100) +
-				"  shuf " + (Player.getShuffle() ? "on" : "off") +
-				"  rep " + rep;
 		}
 
 		function toggleBar() {
@@ -279,6 +327,7 @@
 		async function loadPlaylists() {
 			const list = [{ name: "Liked Songs", uri: "liked", liked: true }];
 			const res = await Spicetify.Platform.RootlistAPI.getContents();
+			if (!res || !Array.isArray(res.items)) throw new Error("could not read your playlists (unexpected answer)");
 			(function walk(items, prefix) {
 				(items || []).forEach((i) => {
 					if (i.type === "folder") walk(i.items, prefix + i.name + "/");
@@ -292,17 +341,20 @@
 		async function loadTracks(pl) {
 			if (pl.liked) {
 				const res = await Spicetify.Platform.LibraryAPI.getTracks({ limit: 9999999 });
+				if (!res || !Array.isArray(res.items)) throw new Error("could not read your liked songs (unexpected answer)");
 				return res.items;
 			}
 			const res = await Spicetify.Platform.PlaylistAPI.getContents(pl.uri, { limit: 9999999 });
+			if (!res || !Array.isArray(res.items)) throw new Error("could not read this playlist (unexpected answer)");
 			return res.items;
 		}
 
 		async function searchTracks(q, limit) {
 			const url = "https://api.spotify.com/v1/search?type=track&limit=" + limit + "&q=" + encodeURIComponent(q);
 			const res = await Spicetify.CosmosAsync.get(url);
-			if (res && (res.code || res.error))throw new Error("search failed: " + errText(res));
-			return (res && res.tracks && res.tracks.items) || [];
+			if (res && (res.code || res.error)) throw new Error("search failed: " + errText(res));
+			if (!res || !res.tracks || !Array.isArray(res.tracks.items)) throw new Error("search failed: unexpected answer");
+			return res.tracks.items;
 		}
 
 		// Album and artist pages use Spotify's own GraphQL, like Spicetify's shuffle+ does.
@@ -334,10 +386,16 @@
 			} catch (e) {
 				// Fallback: the web API through Spicetify.
 				const id = uri.split(":").pop();
-				const res = await Spicetify.CosmosAsync.get("https://api.spotify.com/v1/albums/" + id + "/tracks?limit=50");
-				if (!res || res.code || res.error) throw new Error("could not load album: " + errText(res));
+				let url = "https://api.spotify.com/v1/albums/" + id + "/tracks?limit=50";
+				const items = [];
+				for (let page = 0; url && page < 10; page++) {
+					const res = await Spicetify.CosmosAsync.get(url);
+					if (!res || res.code || res.error || !Array.isArray(res.items)) throw new Error("could not load album: " + errText(res));
+					res.items.forEach((t) => items.push(Object.assign({}, t, { album: { uri } })));
+					url = res.next;
+				}
 				state.albumSource = "web";
-				return res.items.map((t) => Object.assign({}, t, { album: { uri } }));
+				return items;
 			}
 		}
 
@@ -368,13 +426,13 @@
 			const dur = durOf(t);
 			return (
 				String(n).padStart(width) + (here ? " > " : "   ") +
-				nameOf(t) + " - " + artistsOf(t) + (dur ? "  [" + fmtTime(dur) + "]" : "")
+				label(t) + (dur ? "  [" + fmtTime(dur) + "]" : "")
 			);
 		}
 
 		function showPage() {
 			const v = state.view;
-			if (!v) return;
+			if (!v || !v.items.length) return;
 			const width = String(v.items.length).length;
 			const end = Math.min(v.items.length, v.shown + pageSize());
 			for (let i = v.shown; i < end; i++) {
@@ -416,7 +474,9 @@
 		}
 
 		function openView(kind, title, items, uri) {
-			if (state.view) state.stack.push(state.view);
+			state.nav++;
+			const same = state.view && state.view.kind === kind && state.view.title === title;
+			if (state.view && !same) state.stack.push(state.view);
 			if (state.stack.length > 5) state.stack.shift();
 			state.view = { kind, title, items, uri, shown: 0 };
 			render(state.view);
@@ -425,6 +485,7 @@
 		function back() {
 			const v = state.stack.pop();
 			if (!v) return print("nothing to go back to", "dim");
+			state.nav++;
 			v.shown = 0;
 			state.view = v;
 			render(v);
@@ -455,7 +516,7 @@
 
 		// Items of the list on screen where every word matches.
 		function matching(v, words) {
-			const ws = words.toLowerCase().split(/\s+/).filter(Boolean);
+			const ws = words.toLowerCase().split(/\s+/).filter((w) => w && !/^[-\u2013\u2014]+$/.test(w));
 			return v.items.filter((it) => {
 				const text = textOf(v, it).toLowerCase();
 				return ws.every((w) => text.includes(w));
@@ -464,14 +525,16 @@
 
 		async function openPlaylist(pl) {
 			print("loading...", "dim");
+			const nav = state.nav;
 			const items = await loadTracks(pl);
+			if (nav !== state.nav) return; // you opened something else while this loaded
 			openView("tracks", pl.name, items, pl.uri);
 			store("last", { name: pl.name, uri: pl.uri, liked: !!pl.liked });
 			remember({ kind: "playlist", name: pl.name, uri: pl.uri, liked: !!pl.liked });
 		}
 
 		function describe(t) {
-			return nameOf(t) + " - " + artistsOf(t);
+			return label(t);
 		}
 
 		async function playTrackInView(n) {
@@ -481,8 +544,18 @@
 			if (v.kind === "tracks" && v.uri === "liked") {
 				// No sure play context for Liked Songs: play the song, queue the next 50.
 				await Player.playUri(t.uri);
-				const rest = v.items.slice(n, n + 50).map((x) => ({ uri: x.uri }));
-				if (rest.length) await Spicetify.addToQueue(rest);
+				print("playing: " + describe(t), "acc");
+				try {
+					await dropOurQueue();
+					const rest = v.items.slice(n, n + 50).filter((x) => x.uri);
+					if (rest.length) {
+						await Spicetify.addToQueue(rest.map((x) => ({ uri: x.uri })));
+						state.ours = rest.map((x) => x.uri);
+					}
+				} catch (e) {
+					print("playing, but could not queue the next songs: " + errText(e), "err");
+				}
+				return;
 			} else if (v.kind === "tracks" && v.uri) {
 				const skipTo = t.uid ? { uri: t.uri, uid: t.uid } : { uri: t.uri };
 				await Player.playUri(v.uri, {}, { skipTo });
@@ -492,11 +565,20 @@
 			print("playing: " + describe(t), "acc");
 		}
 
+		// Take back songs this terminal queued earlier, so queues do not pile up.
+		async function dropOurQueue() {
+			const api = Spicetify.Platform.PlayerAPI;
+			if (!state.ours.length || !api || !api.getQueue || !api.removeFromQueue) return;
+			const q = await api.getQueue();
+			const mine = (q.queued || []).filter((x) => state.ours.includes(x.uri));
+			if (mine.length) await api.removeFromQueue(mine.map((x) => ({ uri: x.uri, uid: x.uid })));
+			state.ours = [];
+		}
+
 		// Item n of the list on screen, or the song that is playing when n is empty.
 		function songFor(args) {
 			if (/^\d+$/.test(args)) {
-				const v = state.view;
-				const t = isSongView(v) && v.items[Number(args) - 1];
+				const t = songAt(Number(args));
 				if (!t) throw new Error("no song " + args + " on screen");
 				return t;
 			}
@@ -571,6 +653,7 @@
 							if (!pl) return print("no item " + n, "err");
 							if (pl.liked) return openPlaylistAndPlay(pl);
 							await Player.playUri(pl.uri);
+							remember({ kind: "playlist", name: pl.name, uri: pl.uri, liked: false });
 							return print("playing playlist: " + pl.name, "acc");
 						}
 						if (v.kind === "recent") return pick(n);
@@ -598,16 +681,22 @@
 				desc: "/playlist lists, /playlist <number or name> opens one",
 				async run(args) {
 					if (!args) {
+						const nav = state.nav;
 						const list = await loadPlaylists();
+						if (nav !== state.nav) return;
 						return openView("playlists", "playlists", list);
 					}
 					const list = state.playlists || (await loadPlaylists());
-					const find = (l) => {
-						const q = args.toLowerCase();
-						return l.find((p) => p.name.toLowerCase() === q) || l.find((p) => p.name.toLowerCase().includes(q));
-					};
+					const q = args.toLowerCase();
+					const last = (p) => p.name.split("/").pop().toLowerCase();
+					const find = (l) =>
+						l.find((p) => p.name.toLowerCase() === q) ||
+						l.find((p) => last(p) === q) ||
+						l.find((p) => p.name.toLowerCase().includes(q));
 					let pl;
-					if (/^\d+$/.test(args)) pl = list[Number(args) - 1];
+					// A number picks from the list on screen. A number too big to be a row is a name.
+					const onScreen = state.view && state.view.kind === "playlists" ? state.view.items : list;
+					if (/^\d+$/.test(args) && Number(args) >= 1 && Number(args) <= onScreen.length) pl = onScreen[Number(args) - 1];
 					else {
 						pl = find(list);
 						if (!pl) pl = find(await loadPlaylists()); // may be new since startup
@@ -621,7 +710,9 @@
 				desc: "/search <words> lists songs, then type a number",
 				async run(args) {
 					if (!args) return print("usage: /search <words>", "err");
+					const nav = state.nav;
 					const found = await searchTracks(args, 20);
+					if (nav !== state.nav) return;
 					if (!found.length) return print("no results for: " + args, "err");
 					openView("search", "search: " + args, found);
 				},
@@ -636,9 +727,9 @@
 			queue: {
 				desc: "/queue shows what plays next, /queue <number> adds that song from the list",
 				async run(args) {
+					if (args && !/^\d+$/.test(args)) return print("usage: /queue or /queue <number>", "err");
 					if (/^\d+$/.test(args)) {
-						const v = state.view;
-						const t = isSongView(v) && v.items[Number(args) - 1];
+						const t = songAt(Number(args));
 						if (!t) return print("no song " + args + " on screen", "err");
 						await Spicetify.addToQueue([{ uri: t.uri }]);
 						return print("queued: " + describe(t), "acc");
@@ -658,11 +749,14 @@
 			album: {
 				desc: "/album shows the album of the playing song, /album <number> uses a song on screen",
 				async run(args) {
+					if (args && !/^\d+$/.test(args)) return print("usage: /album or /album <number>", "err");
 					const t = songFor(args);
 					const uri = t.album && t.album.uri;
 					if (!uri) return print("no album for this song", "err");
 					print("loading...", "dim");
+					const nav = state.nav;
 					const items = await albumTracks(uri);
+					if (nav !== state.nav) return;
 					if (!items.length) return print("that album has no songs", "err");
 					openView("tracks", "album: " + ((t.album && t.album.name) || "album"), items, uri);
 				},
@@ -670,25 +764,28 @@
 			artist: {
 				desc: "/artist shows top songs of the playing artist, /artist <number> uses a song on screen",
 				async run(args) {
+					if (args && !/^\d+$/.test(args)) return print("usage: /artist or /artist <number>", "err");
 					const t = songFor(args);
 					const a = Array.isArray(t.artists) && t.artists[0];
 					if (!a || !a.uri) return print("no artist for this song", "err");
 					print("loading...", "dim");
+					const nav = state.nav;
 					const r = await artistTopTracks(a.uri);
+					if (nav !== state.nav) return;
 					if (!r.items.length) return print("no top songs for this artist", "err");
 					openView("tracks", "artist: " + (r.name || a.name), r.items, null);
 				},
 			},
 			vol: {
 				desc: "/vol shows, /vol 50 sets, /vol +10 or -10 changes",
-				run(args) {
+				async run(args) {
 					if (args) {
+						if (!/^[+-]?\d{1,3}(\.\d+)?$/.test(args)) return print("usage: /vol 0-100, /vol +10, /vol -10", "err");
 						const rel = /^[+-]/.test(args);
 						const n = parseFloat(args);
-						if (isNaN(n)) return print("usage: /vol 0-100", "err");
 						const level = (rel ? Math.round(Player.getVolume() * 100) + n : n) / 100;
 						const clamped = Math.min(1, Math.max(0, level));
-						Player.setVolume(clamped);
+						await Player.setVolume(clamped);
 						return print("volume: " + Math.round(clamped * 100) + "%");
 					}
 					print("volume: " + Math.round(Player.getVolume() * 100) + "%");
@@ -696,36 +793,38 @@
 			},
 			seek: {
 				desc: "/seek 1:30, /seek 90, /seek +10, /seek -10",
-				run(args) {
-					if (!args) return print("usage: /seek 1:30 or +10 or -10", "err");
+				async run(args) {
+					const usage = "usage: /seek 1:30, /seek 1:02:03, /seek 90, /seek +10, /seek -10";
+					if (!args) return print(usage, "err");
 					const rel = /^[+-]/.test(args);
 					const neg = args[0] === "-";
 					const body = args.replace(/^[+-]/, "");
-					let sec;
-					if (body.includes(":")) {
-						const [m, s] = body.split(":");
-						sec = Number(m) * 60 + Number(s);
-					} else sec = parseFloat(body);
-					if (isNaN(sec)) return print("usage: /seek 1:30 or +10 or -10", "err");
+					if (!/^\d+(\.\d+)?(:\d+(\.\d+)?){0,2}$/.test(body)) return print(usage, "err");
+					let sec = body.split(":").reduce((total, part) => total * 60 + parseFloat(part), 0);
 					if (neg) sec = -sec;
 					const ms = rel ? Player.getProgress() + sec * 1000 : sec * 1000;
-					Player.seek(Math.max(1, ms));
+					// Spicetify reads values up to 1 as a fraction of the song, so never send 0 < ms < 2.
+					await Player.seek(ms <= 0 ? 0 : Math.max(2, ms));
 				},
 			},
 			shuffle: {
 				desc: "/shuffle toggles, /shuffle on or /shuffle off sets it",
-				run(args) {
+				async run(args) {
 					const want = args.toLowerCase();
-					const on = want === "on" || want === "off" ? want === "on" : !Player.getShuffle();
-					Player.setShuffle(on);
+					if (want && want !== "on" && want !== "off") return print("usage: /shuffle, /shuffle on, /shuffle off", "err");
+					const on = want ? want === "on" : !Player.getShuffle();
+					await Player.setShuffle(on);
 					print("shuffle: " + (on ? "on" : "off"));
 				},
 			},
 			repeat: {
-				desc: "cycle repeat: off, all, one",
-				run() {
-					const mode = (Player.getRepeat() + 1) % 3;
-					Player.setRepeat(mode);
+				desc: "/repeat cycles off, all, one. /repeat off, /repeat all, /repeat one sets it",
+				async run(args) {
+					const want = args.toLowerCase();
+					const names = ["off", "all", "one"];
+					if (want && !names.includes(want)) return print("usage: /repeat, /repeat off, /repeat all, /repeat one", "err");
+					const mode = want ? names.indexOf(want) : (Player.getRepeat() + 1) % 3;
+					await Player.setRepeat(mode);
 					print("repeat: " + ["off", "all", "one"][mode]);
 				},
 			},
@@ -793,7 +892,9 @@
 				run() {
 					print("ttyfy " + VERSION, "acc");
 					print("  Ctrl+` shows or hides this terminal, /gui does the same");
-					print("  Tab completes, Up and Down bring back commands, ; chains commands");
+					print("  Tab completes, Up and Down bring back commands, PageUp and PageDown scroll"
+					);
+					print("  chain commands with ; before a /command, for example /vol 30; /next");
 					print("  unofficial, not made by Spotify", "dim");
 				},
 			},
@@ -815,6 +916,7 @@
 					has("GraphQL album query", !!(S.GraphQL && S.GraphQL.Request && S.GraphQL.Definitions && S.GraphQL.Definitions.queryAlbumTracks));
 					has("GraphQL artist query", !!(S.GraphQL && S.GraphQL.Request && S.GraphQL.Definitions && S.GraphQL.Definitions.queryArtistOverview));
 					has("CosmosAsync.get (search)", !!(S.CosmosAsync && S.CosmosAsync.get));
+					has("Player.data and song-change events", !!(Player.addEventListener && Player.data !== undefined));
 					has("saved settings (localStorage)", store("debug-probe", 1) === 1);
 					store("debug-probe", null);
 					if (args !== "live") return print("/debug live tries them for real (reads only, changes nothing)", "dim");
@@ -832,10 +934,30 @@
 					await check("playlist songs", async () => {
 						const pl = (state.playlists || []).find((p) => !p.liked);
 						if (!pl) return "skipped: no playlist";
-						return (await P.PlaylistAPI.getContents(pl.uri, { limit: 3 })).items.length + " rows";
+						const res = await P.PlaylistAPI.getContents(pl.uri, { limit: 3 });
+						if (!Array.isArray(res.items)) throw new Error("no items in the answer");
+						if (res.items.length && !res.items.every((x) => x.uri && x.name)) throw new Error("rows have no uri or name");
+						return res.items.length + " rows";
 					});
-					await check("liked songs", async () => (await L.getTracks({ limit: 3 })).items.length + " rows");
-					await check("search", async () => (await searchTracks("a", 1)).length + " result");
+					await check("liked songs", async () => {
+						const res = await L.getTracks({ limit: 3 });
+						if (!Array.isArray(res.items)) throw new Error("no items in the answer");
+						if (res.items.length && !res.items.every((x) => x.uri && x.name)) throw new Error("rows have no uri or name");
+						return res.items.length + " rows";
+					});
+					await check("search", async () => {
+						const found = await searchTracks("a", 1);
+						if (found.length && !found[0].uri) throw new Error("result has no uri");
+						return found.length + " result";
+					});
+					await check("playing song details", async () => {
+						if (!cur) return "skipped: nothing playing";
+						const missing = ["uri", "name"].filter((k) => !cur[k]);
+						if (!Array.isArray(cur.artists)) missing.push("artists");
+						if (!(cur.album && cur.album.uri)) missing.push("album.uri");
+						if (missing.length) throw new Error("missing " + missing.join(", ") + " (marks, /album, /artist will not work)");
+						return "name, uri, artists, album ok";
+					});
 					await check("queue", async () => {
 						const q = await P.PlayerAPI.getQueue();
 						return (q.queued || []).length + (q.nextUp || []).length + " items";
@@ -865,10 +987,11 @@
 				desc: "/theme lists colors, /theme amber changes them (green, amber, white, solarized, default)",
 				run(args) {
 					const name = args.toLowerCase();
-					if (!name) return print("colors: " + Object.keys(PALETTES).join(", ") + ", default  (now: " + (store("theme") || "default") + ")");
+					if (!name) return print("colors: " + Object.keys(PALETTES).join(", ") + ", default  (now: " + (theme || "default") + ")");
 					if (name !== "default" && !hasPalette(name)) return print("no color scheme: " + args, "err");
-					applyPalette(name === "default" ? null : name);
-					store("theme", name === "default" ? null : name);
+					theme = name === "default" ? null : name;
+					applyPalette(theme);
+					store("theme", theme);
 					print("colors: " + name, "acc");
 				},
 			},
@@ -877,7 +1000,9 @@
 		};
 
 		async function openPlaylistAndPlay(pl) {
+			const nav = state.nav;
 			const items = await loadTracks(pl);
+			if (nav !== state.nav) return;
 			openView("tracks", pl.name, items, pl.uri);
 			store("last", { name: pl.name, uri: pl.uri, liked: !!pl.liked });
 			remember({ kind: "playlist", name: pl.name, uri: pl.uri, liked: !!pl.liked });
@@ -885,8 +1010,9 @@
 		}
 
 		async function run(raw) {
-			const text = raw.trim();
+			const text = raw.replace(/[\u2028\u2029\r\n]+/g, " ").trim();
 			if (!text) return;
+			state.ran = true;
 			print("ttyfy> " + text, "echo");
 			out.scrollTop = out.scrollHeight;
 			if (/^\d+$/.test(text)) {
@@ -898,7 +1024,8 @@
 				}
 				return renderBar();
 			}
-			const m = /^\/?(\S+)\s*(.*)$/.exec(text);
+			const m = /^\/?(\S+)\s*([\s\S]*)$/.exec(text);
+			if (!m) return print("command not found: " + text, "err");
 			let name = m[1].toLowerCase();
 			if (own(ALIASES, name)) name = ALIASES[name];
 			const cmd = own(commands, name) ? commands[name] : null;
@@ -914,8 +1041,14 @@
 
 		// "a; b" runs a, then b.
 		async function runLine(raw) {
-			const parts = raw.split(";").map((p) => p.trim()).filter(Boolean);
-			for (const p of parts) await run(p);
+			const parts = raw.split(/;\s*(?=\/|\d+\s*(?:;|$))/).map((p) => p.trim()).filter(Boolean);
+			for (const p of parts) {
+				try {
+					await run(p);
+				} catch (e) {
+					print("error: " + errText(e), "err");
+				}
+			}
 		}
 
 		// Tab: complete a command name, or an argument for a few commands.
@@ -943,8 +1076,7 @@
 
 		// ---------- input ----------
 
-		input.addEventListener("keydown", (e) => {
-			e.stopPropagation();
+		function onKey(e) {
 			if (e.isComposing || e.keyCode === 229) return; // still typing through an IME
 			if (e.key === "Enter") {
 				const v = input.value;
@@ -952,26 +1084,39 @@
 					state.history.push(v);
 					state.hpos = state.history.length;
 				}
+				state.draft = "";
 				input.value = "";
 				runLine(v);
 			} else if (e.key === "ArrowUp") {
 				e.preventDefault();
-				if (state.hpos > 0) input.value = state.history[--state.hpos];
+				if (state.hpos > 0) {
+					if (state.hpos === state.history.length) state.draft = input.value;
+					input.value = state.history[--state.hpos];
+				}
 			} else if (e.key === "ArrowDown") {
 				e.preventDefault();
 				if (state.hpos >= state.history.length) return; // not browsing history, keep the draft
 				if (state.hpos < state.history.length - 1) input.value = state.history[++state.hpos];
 				else {
 					state.hpos = state.history.length;
-					input.value = "";
+					input.value = state.draft;
 				}
 			} else if (e.key === "Tab") {
 				e.preventDefault();
 				complete();
+			} else if (e.key === "PageUp" || e.key === "PageDown") {
+				e.preventDefault();
+				out.scrollBy(0, (e.key === "PageUp" ? -1 : 1) * out.clientHeight * 0.9);
 			} else if (e.ctrlKey && e.key.toLowerCase() === "l") {
 				e.preventDefault();
 				out.textContent = "";
+				state.rows = [];
 			}
+		}
+
+		input.addEventListener("keydown", (e) => {
+			e.stopPropagation();
+			onKey(e);
 		});
 		input.addEventListener("keyup", (e) => e.stopPropagation());
 
@@ -979,29 +1124,40 @@
 			if (!String(window.getSelection())) input.focus();
 		});
 
-		// Typing while the terminal is showing goes to the command line, even after
-		// the input lost focus (for example after selecting text to copy).
-		document.addEventListener(
+		// Keys pressed while the terminal is showing but the input lost focus (for
+		// example after selecting text to copy) still go to the command line, and
+		// never reach Spotify's own shortcuts underneath.
+		const FOCUS_KEYS = ["Backspace", "Delete", "Home", "End", "Enter", "Tab", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "PageUp", "PageDown"];
+		window.addEventListener(
 			"keydown",
 			(e) => {
 				if (root.classList.contains("ttyfy-hidden") || document.activeElement === input) return;
-				if (e.ctrlKey || e.metaKey || e.altKey) return;
-				if (e.key.length === 1 || e.key === "Backspace") input.focus();
+				const paste = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "v";
+				if (!paste && (e.ctrlKey || e.metaKey || e.altKey)) return;
+				if (!paste && e.key.length !== 1 && !FOCUS_KEYS.includes(e.key)) return;
+				e.stopPropagation();
+				input.focus();
+				if (FOCUS_KEYS.includes(e.key) && !["Backspace", "Delete", "Home", "End", "ArrowLeft", "ArrowRight"].includes(e.key)) onKey(e);
 			},
 			true
 		);
 
 		// Ctrl+` hides or shows the terminal from anywhere.
-		document.addEventListener(
+		window.addEventListener(
 			"keydown",
 			(e) => {
-				if (e.ctrlKey && (e.key === "`" || e.code === "Backquote")) {
+				if (e.ctrlKey && !e.altKey && !e.metaKey && (e.key === "`" || e.code === "Backquote")) {
 					e.preventDefault();
-					toggleGui();
+					if (!e.repeat) toggleGui();
 				}
 			},
 			true
 		);
+
+		window.addEventListener("resize", () => {
+			out.scrollTop = out.scrollHeight;
+			updateCursor();
+		});
 
 		if (Player.addEventListener) {
 			Player.addEventListener("songchange", () => {
@@ -1022,7 +1178,10 @@
 		document.documentElement.classList.add("ttyfy-ready");
 
 		function welcome() {
-			const t = current();
+			let t = null;
+			try {
+				t = current();
+			} catch (e) {}
 			if (t) print((Player.isPlaying() ? "playing: " : "paused:  ") + describe(t), "dim");
 			const last = store("last");
 			if (last) print("last: " + last.name + "  (/last to reopen)", "dim");
@@ -1033,7 +1192,7 @@
 		loadPlaylists()
 			.then((list) => {
 				// If you already typed something, leave your screen alone.
-				if (!state.view) openView("playlists", "playlists", list);
+				if (!state.view && !state.ran) openView("playlists", "playlists", list);
 				welcome();
 			})
 			.catch((e) => {

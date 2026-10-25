@@ -38,9 +38,7 @@
 
 /* Spotify's own color and font variables, pointed at the scheme. */
 :root,
-body,
-.encore-dark-theme,
-.encore-light-theme {
+body {
   --background-base: var(--spice-main);
   --background-highlight: var(--spice-card);
   --background-press: var(--spice-card);
@@ -204,6 +202,33 @@ a[aria-current="page"]::before,
 /*   spicetify enable-devtool  (then Ctrl+Shift+I in Spotify)         */
 /* ------------------------------------------------------------------ */
 
+/* Spotify sets its own color variables on these classes, so the same
+   mapping as in section 1 is repeated here to win over them. */
+.encore-dark-theme,
+.encore-light-theme {
+  --background-base: var(--spice-main);
+  --background-highlight: var(--spice-card);
+  --background-press: var(--spice-card);
+  --background-elevated-base: var(--spice-main);
+  --background-elevated-highlight: var(--spice-card);
+  --background-elevated-press: var(--spice-card);
+  --background-tinted-base: var(--spice-card);
+  --background-tinted-highlight: var(--spice-card);
+  --background-tinted-press: var(--spice-card);
+  --text-base: var(--spice-text);
+  --text-subdued: var(--spice-subtext);
+  --text-bright-accent: var(--spice-button);
+  --text-announcement: var(--spice-button);
+  --essential-base: var(--spice-text);
+  --essential-subdued: var(--spice-subtext);
+  --essential-bright-accent: var(--spice-button);
+  --decorative-base: var(--spice-text);
+  --decorative-subdued: var(--spice-misc);
+  --encore-body-font-stack: var(--tty-font);
+  --encore-title-font-stack: var(--tty-font);
+  --font-family: var(--tty-font);
+}
+
 /* Window background. */
 .Root__top-container,
 .Root {
@@ -339,11 +364,21 @@ html:not(.ttyfy-ready)::before {
 
 #ttyfy-bar {
   flex: none;
+  display: flex;
   padding: 2px 12px;
   border-top: 1px solid var(--tty-accent);
   white-space: pre;
   overflow: hidden;
+}
+/* The title gives way first, so time, meter and volume always stay visible. */
+#ttyfy-bartitle {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
   text-overflow: ellipsis;
+}
+#ttyfy-barinfo {
+  flex: none;
 }
 #ttyfy-bar[hidden] {
   display: none;
@@ -374,7 +409,7 @@ html:not(.ttyfy-ready)::before {
   width: 1ch;
   height: 1.2em;
   margin-top: -0.6em;
-  background: rgba(var(--tty-rgb-accent), 0.7);
+  background: rgba(var(--tty-rgb-accent), 0.5);
   pointer-events: none;
   animation: ttyfy-blink 1.1s steps(1, end) infinite;
 }
@@ -392,6 +427,16 @@ html:not(.ttyfy-ready)::before {
   #ttyfy-cursor {
     animation: none;
   }
+}
+
+/* Hidden twin of the input text, used to measure where the cursor goes. */
+#ttyfy-mirror {
+  position: absolute;
+  top: 0;
+  left: 0;
+  visibility: hidden;
+  white-space: pre;
+  pointer-events: none;
 }
 
 #ttyfy-in {
