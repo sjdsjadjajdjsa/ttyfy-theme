@@ -1,64 +1,41 @@
 # ttyfy
 
-Spotify, but it is a terminal. A theme for [Spicetify](https://spicetify.app).
+Turn Spotify into a terminal. A theme for [Spicetify](https://spicetify.app).
 
-When Spotify opens you get a black screen with a prompt. No covers, no buttons, no player bar. You type commands. Music keeps playing underneath.
+![ttyfy showing a playlist, the player bar and moving bars](docs/images/cava.png)
 
-Press Ctrl+` (or type `/gui`) to hide the terminal and see normal Spotify, which is also restyled like a terminal: monospace font, square corners, 1px borders. Press Ctrl+` again to come back.
+Open Spotify and you get a black screen with a prompt. No covers, no buttons. You type `/playlist`, pick a number, and music plays. It runs on top of the normal Spotify app, so your account, library and playback all work as usual.
 
-## Color schemes
+*The screenshots on this page come from a test setup with invented songs and artists.*
 
-- `green` (default): classic green on black
-- `amber`: amber on black
-- `white`: white on black
-- `solarized`: soft solarized colors on a dark teal background
+## What you get
 
-## Commands
+- A command line for Spotify: browse playlists, search, play, queue, skip, set volume, like songs.
+- Type a number to pick from any list on screen. No mouse needed.
+- A one-line player bar and moving bars (`/cava`), both off until you ask for them.
+- Four color schemes: green (default), amber, white and solarized. Change them on the fly with `/theme`.
+- Monospace font, square corners, 1px borders, no shadows or gradients. Normal Spotify is restyled the same way if you hide the terminal.
+- A built-in checker (`/debug live`) that tells you which parts work in your version of Spotify.
 
-Start with these:
+## Screenshots
 
-| command | what it does |
+| Your playlists | A playlist |
 | --- | --- |
-| `/playlist` | list your playlists (Liked Songs is first), then type a number to open one |
-| `/search words` | list songs, then type a number to play one |
-| `/go words` | jump to the best match in the list on screen |
-| `/recent` | songs and playlists you played lately |
-| `/play words` | play the first match |
-| `/pause`, `/resume` | control playback |
-| `/next`, `/previous` | skip |
-| `/now` | the current song, with progress |
-| `/help` | this short list. `/help all` shows every command, `/help play` explains one |
+| ![Playlist list](docs/images/home.png) | ![Songs in a playlist](docs/images/playlist.png) |
 
-When a list is on screen, just type its number. In a playlist list it opens that playlist, in a song list it plays that song. `/back` goes back to the last list. Lists fit your window, `/more` shows the next page. `/filter words` keeps only the matching rows of a long list. While a playlist is open, `/play` with a few words plays the matching song from it.
-
-Find more of the same:
-
-| command | what it does |
+| Search, amber scheme | Player bar and bars |
 | --- | --- |
-| `/album` | the album of the playing song, `/album 4` uses song 4 on screen |
-| `/artist` | top songs of the playing artist, `/artist 4` uses song 4 on screen |
-| `/queue` | what plays next |
-| `/queue 3` | add song 3 on screen to the queue |
-| `/last` | reopen the last playlist you opened |
-| `/random` | play a random playlist |
-| `/cava` | moving bars above the prompt that follow the song. `/cava off` hides them, `/cava bars 24`, `/cava rows 6` change the size |
-
-The rest: `/toggle`, `/vol 40`, `/vol +10`, `/seek 1:30`, `/seek +10`, `/shuffle` (or `/shuffle on`, `/shuffle off`), `/repeat` (or `/repeat off`, `/repeat all`, `/repeat one`), `/like`, `/unlike`, `/theme amber` (colors: green, amber, white, solarized, default), `/bar` (a one-line player bar at the bottom, off by default), `/clear`, `/about`, `/gui`.
-
-Tab completes commands, playlist names (`/playlist road` then Tab) and color names. Up and down arrows bring back old commands. A semicolon before a `/command` chains commands: `/vol 30; /next`. PageUp and PageDown scroll the screen.
-
-The `/cava` bars follow the song's loudness, beat and notes from Spotify's stored analysis, played back in time with the music. Spotify gives themes no live sound, so it is not a true spectrum, and a few songs have no analysis (the bars then stay flat).
-
-On start the terminal opens on your playlists, so you can type a number right away.
-
-If something does not work, run `/debug live`. It checks which Spicetify features your Spotify version has and tries each one without changing anything. Send the output with your bug report.
+| ![Search results in amber](docs/images/amber.png) | ![Player bar and cava](docs/images/cava.png) |
 
 ## Install
 
-You need Spicetify set up already.
+You need [Spicetify](https://spicetify.app/docs/getting-started) set up first.
 
-1. Copy this folder into your Spicetify Themes folder and name it `ttyfy`. Find the folder with `spicetify path userdata`, then look in `Themes`.
-2. Run:
+### Manual
+
+1. Download this repo (green **Code** button, then **Download ZIP**) or clone it.
+2. Copy the folder into your Spicetify Themes folder and name it `ttyfy`. To find the folder, run `spicetify path userdata` and open `Themes`. It must contain `user.css`, `theme.js` and `color.ini` directly inside.
+3. Run:
 
 ```
 spicetify config current_theme ttyfy
@@ -66,22 +43,94 @@ spicetify config color_scheme green
 spicetify apply
 ```
 
-To switch scheme, change `green` to `amber`, `white` or `solarized` and run `spicetify apply` again.
+To change the scheme later, swap `green` for `amber`, `white` or `solarized` and run `spicetify apply` again.
 
-## Screenshots
+### Marketplace
 
-Not added yet. `preview.png` is a placeholder, replace it with a real screenshot before listing the theme.
+Set `current_theme` to `marketplace`, then install ttyfy from the Themes tab. Manual and Marketplace installs are either/or, pick one. The terminal covers the Marketplace screen, so press Ctrl+` first if you want to uninstall.
 
-## Install from the Marketplace
+## First steps
 
-Set `current_theme` to `marketplace`, then install ttyfy from the Themes tab. Manual install and Marketplace install are either/or, pick one. The terminal covers the Marketplace screen, so press Ctrl+` first if you want to uninstall.
+1. Type `/playlist` to see your playlists. Type a number to open one.
+2. Type a song number to play it.
+3. Type `/help` for the short list of commands, `/help all` for every one.
 
-`/theme` colors override the Marketplace scheme picker until you run `/theme default`.
+Press Ctrl+` any time to hide the terminal and see normal Spotify. Press it again to come back.
+
+## Commands
+
+The main ones:
+
+| Command | What it does |
+| --- | --- |
+| `/playlist` | list your playlists (Liked Songs first), then type a number to open one |
+| `/search words` | list songs, then type a number to play one |
+| `/go words` | jump to the best match in the list on screen |
+| `/recent` | songs and playlists you played lately |
+| `/play words` | play the first match |
+| `/pause`, `/resume` | control playback |
+| `/next`, `/previous` | skip |
+| `/now` | the current song, with progress |
+| `/help` | the short list. `/help all` shows every command, `/help play` explains one |
+
+When a list is on screen, type its number. In a playlist list that opens the playlist, in a song list it plays the song. `/back` goes back a list, `/more` shows the next page, and `/filter words` keeps only the matching rows.
+
+More:
+
+| Command | What it does |
+| --- | --- |
+| `/album`, `/artist` | the album or top songs for the playing song. Add a number to use a song on screen |
+| `/queue` | what plays next. `/queue 3` adds song 3 on screen to the queue |
+| `/last` | reopen the last playlist you opened |
+| `/random` | play a random playlist |
+| `/vol 40`, `/vol +10` | volume |
+| `/seek 1:30`, `/seek +10` | jump in the song |
+| `/shuffle`, `/repeat` | toggle shuffle, cycle repeat (or `/shuffle on`, `/repeat all`) |
+| `/like`, `/unlike` | save or remove the current song |
+| `/theme amber` | change colors: green, amber, white, solarized, default |
+| `/bar` | a one-line player bar at the bottom, off by default |
+| `/cava` | moving bars that follow the song. `/cava off`, `/cava bars 24`, `/cava rows 6` |
+| `/clear`, `/about`, `/gui` | clear the screen, version and keys, hide the terminal |
+
+Keys: Tab completes commands, playlist names and color names. Up and down bring back old commands. PageUp and PageDown scroll. A semicolon before a `/command` chains commands, for example `/vol 30; /next`.
+
+About `/cava`: Spotify gives themes no live sound, so the bars are not a true spectrum. They follow the song's loudness, beat and notes from Spotify's stored analysis, played back in time with the music. A few songs have no analysis, and the bars stay flat for those.
+
+## Color schemes
+
+| Scheme | Look |
+| --- | --- |
+| `green` (default) | classic green on black |
+| `amber` | amber on black |
+| `white` | white on black |
+| `solarized` | soft solarized colors on dark teal |
+
+## Turn it off
+
+To go back to normal Spotify and keep the theme files:
+
+```
+spicetify config current_theme " "
+spicetify apply
+```
+
+To remove it completely, run those two lines first, then delete the `ttyfy` folder from `Themes`. If you delete the folder first, Spicetify will keep saying the theme is not found until you run the two lines.
+
+## Troubleshooting
+
+- **Nothing changed after `spicetify apply`.** Type `/about` in the terminal. If there is no terminal, check that `Themes/ttyfy/theme.js` exists and that `current_theme` is `ttyfy`.
+- **A command fails.** Run `/debug live`. It tests each Spotify feature without changing anything and prints `ok`, `MISSING` or `FAIL` for each. Include that output when you report a problem.
+- **A pop-up is hidden** (login, update). Press Ctrl+` to hide the terminal, deal with the pop-up, then press it again.
+- **Something looks wrong after a Spotify update.** The few rules that depend on Spotify class names are in one commented section of `user.css`. Open an issue and say what you see.
 
 ## Notes
 
-This is unofficial and not made by Spotify. The terminal covers Spotify's own screens, so pop-ups such as a login or update window can end up hidden behind it. Use `/gui` to reach them. Spotify changes its interface often, so parts of the theme can break after an update. The few rules that depend on Spotify class names are in one section of `user.css`. The commands use Spicetify's API in `theme.js`, which can also change. If something looks wrong, open an issue.
+ttyfy is unofficial and not made by Spotify. Spotify changes its interface often, so parts of the theme can break after an update. The commands use Spicetify's API in `theme.js`, which can change too.
+
+## Contributing
+
+`CLAUDE.md` explains the file layout, how to add a color scheme and how to test by hand. Bug reports with the `/debug live` output are the most useful thing you can send.
 
 ## License
 
-See `LICENSE`.
+See [LICENSE](LICENSE).
