@@ -29,7 +29,19 @@ Start with these:
 
 When a list is on screen, just type its number. In a playlist list it opens that playlist, in a song list it plays that song. `/back` goes back to the last list. Lists show 15 rows at a time, `/more` shows the next 15. While a playlist is open, `/play` with a few words plays the matching song from it.
 
-The rest: `/toggle`, `/queue`, `/vol 40`, `/vol +10`, `/seek 1:30`, `/seek +10`, `/shuffle`, `/repeat`, `/like`, `/unlike`, `/bar` (a one-line player bar at the bottom, off by default), `/clear`, `/gui`.
+Find more of the same:
+
+| command | what it does |
+| --- | --- |
+| `/album` | the album of the playing song, `/album 4` uses song 4 on screen |
+| `/artist` | top songs of the playing artist, `/artist 4` uses song 4 on screen |
+| `/queue` | what plays next |
+| `/queue 3` | add song 3 on screen to the queue |
+| `/last` | reopen the last playlist you opened |
+
+The rest: `/toggle`, `/vol 40`, `/vol +10`, `/seek 1:30`, `/seek +10`, `/shuffle` (or `/shuffle on`, `/shuffle off`), `/repeat`, `/like`, `/unlike`, `/theme amber` (colors: green, amber, white, solarized, default), `/bar` (a one-line player bar at the bottom, off by default), `/clear`, `/gui`.
+
+On start the terminal opens on your playlists, so you can type a number right away.
 
 Tab completes a command. Up and down arrows bring back old commands.
 
@@ -50,7 +62,7 @@ To switch scheme, change `green` to `amber`, `white` or `solarized` and run `spi
 
 ## Screenshots
 
-Not added yet. See `preview.png` for a placeholder.
+Not added yet. `preview.png` is a placeholder, replace it with a real screenshot before listing the theme.
 
 ## Install from the Marketplace
 

@@ -6,7 +6,7 @@ A Spicetify theme that turns Spotify into a command line. It is a theme, not a c
 
 - `theme.js`: draws a full-screen terminal over Spotify and runs the slash commands with the Spicetify API (`Spicetify.Player`, `Platform.RootlistAPI`, `PlaylistAPI`, `LibraryAPI`, `CosmosAsync`). It builds text with `textContent`, never HTML. To add a command, add an entry to the `commands` object (name, `desc`, `run(args)`). If it fails to start, the CSS-only look still works.
 - `user.css`: all the styling. Sections 1 to 5 use only `--spice-*` variables, tags and role/aria/data-testid attributes. Section 6 is the only place for Spotify class names, keep it that way and keep it commented. Section 7 styles the terminal and only uses ids that theme.js creates.
-- `color.ini`: color schemes. The first one (`green`) is the default.
+- `color.ini`: color schemes. The first one (`green`) is the default. `theme.js` has a copy of the same colors (`PALETTES`) for `/theme`, so change both when you add or edit a scheme.
 - `manifest.json`: Spicetify Marketplace entry.
 - `preview.png`: placeholder image, replace with a real screenshot.
 - `README.md`: install steps for users.
@@ -19,7 +19,7 @@ A Spicetify theme that turns Spotify into a command line. It is a theme, not a c
 
 1. Copy a block in `color.ini`, for example `[green]`, and rename it.
 2. Change the values. Hex without `#`. Keep every key, Spicetify wants them all.
-3. Add the scheme name to the list in `README.md`.
+3. Add the same colors to `PALETTES` in `theme.js`, and the scheme name to the list in `README.md`.
 4. Test it (below).
 
 Check that `text` and `subtext` are readable on `main`.
@@ -37,6 +37,10 @@ There is no build and Spotify cannot run in CI, so test by hand:
 7. Check `manifest.json` is valid JSON.
 
 To try theme.js without Spotify, load it in a plain HTML page with a fake `Spicetify` object (Playwright works).
+
+## Publishing
+
+The Marketplace lists any public repo with the GitHub topic `spicetify-themes` and a `manifest.json` in the root of the default branch. It loads `theme.js` from the `include` URL, which must be absolute. Replace `preview.png` with a real screenshot first. Marketplace installs cache files through jsDelivr, so a push can take hours to reach users.
 
 ## Rules
 
