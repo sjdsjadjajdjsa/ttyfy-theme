@@ -15,26 +15,21 @@ Press Ctrl+` (or type `/gui`) to hide the terminal and see normal Spotify, which
 
 ## Commands
 
+Start with these:
+
 | command | what it does |
 | --- | --- |
-| `/playlist` | list your playlists (Liked Songs is first) |
-| `/playlist 2` or `/playlist road` | open a playlist as a plain list of songs |
-| `/more` | next page of a long list |
-| `/play` | resume |
-| `/play 5` | play item 5 of the list on screen |
-| `/play some words` | search and play the first match |
-| `/search words` | list songs, then `/play 3` |
-| `/pause`, `/resume`, `/toggle` | control playback |
-| `/next`, `/prev` | skip |
+| `/playlist` | list your playlists (Liked Songs is first), then type a number to open one |
+| `/search words` | list songs, then type a number to play one |
+| `/play words` | play the first match |
+| `/pause`, `/resume` | control playback |
+| `/next`, `/previous` | skip |
 | `/now` | the current song |
-| `/queue` | what plays next |
-| `/vol 40`, `/vol +10` | volume |
-| `/seek 1:30`, `/seek +10` | jump in the song |
-| `/shuffle`, `/repeat` | toggle shuffle, cycle repeat |
-| `/like`, `/unlike` | save or remove the current song |
-| `/bar` | show or hide a one-line player bar at the bottom (off by default) |
-| `/clear` | clear the screen |
-| `/gui` | hide the terminal (Ctrl+` brings it back) |
+| `/help` | this short list. `/help all` shows every command |
+
+When a list is on screen, just type its number. In a playlist list it opens that playlist, in a song list it plays that song. `/back` goes back to the last list. Lists show 15 rows at a time, `/more` shows the next 15. While a playlist is open, `/play` with a few words plays the matching song from it.
+
+The rest: `/toggle`, `/queue`, `/vol 40`, `/vol +10`, `/seek 1:30`, `/seek +10`, `/shuffle`, `/repeat`, `/like`, `/unlike`, `/bar` (a one-line player bar at the bottom, off by default), `/clear`, `/gui`.
 
 Tab completes a command. Up and down arrows bring back old commands.
 
