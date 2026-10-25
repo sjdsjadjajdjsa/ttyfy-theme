@@ -1,0 +1,246 @@
+/*
+ * ttyfy: a terminal look for Spotify, made for Spicetify.
+ *
+ * Sections:
+ *   1. Tokens         colors and font, all read from the color.ini scheme
+ *   2. Base           font, square corners, no shadows, scrollbars
+ *   3. Text           uppercase labels, selection, focus
+ *   4. Controls       inputs, menus, dialogs
+ *   5. Prompt/cursor  ">" marker and blinking block cursor
+ *   6. SPOTIFY CLASS NAMES  the only part that can break after an update
+ *
+ * Sections 1 to 5 use only variables, tags and role/aria/data-testid
+ * attributes. Section 6 uses Spotify class names. Fix those first when
+ * something looks off after a Spotify update.
+ */
+
+/* ------------------------------------------------------------------ */
+/* 1. Tokens                                                          */
+/* ------------------------------------------------------------------ */
+
+:root {
+  /* Fallbacks are the green scheme, so the theme still looks right if
+     a --spice-* variable is missing. */
+  --tty-bg: var(--spice-main, #000000);
+  --tty-fg: var(--spice-text, #33ff33);
+  --tty-dim: var(--spice-subtext, #22aa22);
+  --tty-accent: var(--spice-button, #33ff33);
+  --tty-accent-hi: var(--spice-button-active, #99ff99);
+  --tty-line: var(--spice-misc, #1c5c1c);
+  --tty-rgb-accent: var(--spice-rgb-button, 51, 255, 51);
+  --tty-hover: rgba(var(--tty-rgb-accent), 0.14);
+
+  --tty-font: "JetBrains Mono", "Fira Code", "Cascadia Mono", "SF Mono",
+    "Menlo", "Consolas", "DejaVu Sans Mono", "Liberation Mono",
+    "Courier New", monospace;
+}
+
+/* Spotify's own color and font variables, pointed at the scheme. */
+:root,
+body,
+.encore-dark-theme,
+.encore-light-theme {
+  --background-base: var(--spice-main);
+  --background-highlight: var(--spice-card);
+  --background-press: var(--spice-card);
+  --background-elevated-base: var(--spice-main);
+  --background-elevated-highlight: var(--spice-card);
+  --background-elevated-press: var(--spice-card);
+  --background-tinted-base: var(--spice-card);
+  --background-tinted-highlight: var(--spice-card);
+  --background-tinted-press: var(--spice-card);
+  --text-base: var(--spice-text);
+  --text-subdued: var(--spice-subtext);
+  --text-bright-accent: var(--spice-button);
+  --text-announcement: var(--spice-button);
+  --essential-base: var(--spice-text);
+  --essential-subdued: var(--spice-subtext);
+  --essential-bright-accent: var(--spice-button);
+  --decorative-base: var(--spice-text);
+  --decorative-subdued: var(--spice-misc);
+  --encore-body-font-stack: var(--tty-font);
+  --encore-title-font-stack: var(--tty-font);
+  --font-family: var(--tty-font);
+}
+
+/* ------------------------------------------------------------------ */
+/* 2. Base                                                            */
+/* ------------------------------------------------------------------ */
+
+html,
+body {
+  background-color: var(--tty-bg);
+  color: var(--tty-fg);
+}
+
+*,
+*::before,
+*::after {
+  font-family: var(--tty-font) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
+/* Thin square scrollbars (the standard Chromium kind). */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--tty-bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--tty-line);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--tty-accent);
+}
+
+/* ------------------------------------------------------------------ */
+/* 3. Text                                                            */
+/* ------------------------------------------------------------------ */
+
+/* Section labels, like "RECENTLY PLAYED". */
+h2,
+[role="columnheader"],
+[role="tab"] {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+::selection {
+  background: var(--tty-accent);
+  color: var(--tty-bg);
+}
+
+/* Visible keyboard focus, dashed like a terminal selection. */
+:focus-visible {
+  outline: 1px dashed var(--tty-accent) !important;
+  outline-offset: 1px;
+}
+
+/* ------------------------------------------------------------------ */
+/* 4. Controls                                                        */
+/* ------------------------------------------------------------------ */
+
+input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
+textarea {
+  background-color: var(--tty-bg) !important;
+  color: var(--tty-fg) !important;
+  caret-color: var(--tty-accent);
+  caret-shape: block;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--tty-dim) !important;
+}
+
+/* Context menus, popovers, dialogs and tooltips: boxed like a pane. */
+[role="menu"],
+[role="dialog"],
+[role="tooltip"] {
+  background-color: var(--tty-bg) !important;
+  color: var(--tty-fg) !important;
+  border: 1px solid var(--tty-accent) !important;
+}
+
+[role="menuitem"]:hover,
+[role="menuitem"]:focus-visible {
+  background-color: var(--tty-hover) !important;
+}
+
+/* ------------------------------------------------------------------ */
+/* 5. Prompt marker and cursor                                        */
+/* ------------------------------------------------------------------ */
+
+/* ">" before the current page link and the current tab. */
+a[aria-current="page"]::before,
+[role="tab"][aria-selected="true"]::before {
+  content: ">";
+  margin-right: 0.5ch;
+  color: var(--tty-accent);
+}
+
+/* Selected rows (tracks, library items): boxed in the accent color. */
+[role="row"][aria-selected="true"] {
+  outline: 1px solid var(--tty-accent);
+  outline-offset: -1px;
+}
+
+/* Now playing title: "> title" followed by a blinking block cursor. */
+[data-testid="context-item-info-title"]::before {
+  content: ">";
+  margin-right: 0.5ch;
+  color: var(--tty-accent);
+}
+[data-testid="context-item-info-title"]::after {
+  content: "\2588";
+  margin-left: 0.4ch;
+  color: var(--tty-accent);
+  animation: ttyfy-blink 1.1s steps(1, end) infinite;
+}
+
+@keyframes ttyfy-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-testid="context-item-info-title"]::after {
+    animation: none;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* 6. SPOTIFY CLASS NAMES                                             */
+/*                                                                    */
+/* Everything below depends on class names Spotify can rename. If a   */
+/* pane loses its border or a gradient comes back after an update,    */
+/* fix the selectors in this section only. Inspect with:              */
+/*   spicetify enable-devtool  (then Ctrl+Shift+I in Spotify)         */
+/* ------------------------------------------------------------------ */
+
+/* Window background. */
+.Root__top-container,
+.Root {
+  background-color: var(--tty-bg) !important;
+}
+
+/* The panes: sidebar, main view, right sidebar, player bar.
+   Outline with a negative offset draws the 1px border inside each pane,
+   so nothing moves or changes size. */
+.Root__nav-bar,
+.Root__main-view,
+.Root__right-sidebar,
+.Root__now-playing-bar {
+  background-color: var(--tty-bg) !important;
+  outline: 1px solid var(--tty-accent);
+  outline-offset: -1px;
+}
+
+/* Main view and top bar backgrounds. */
+.main-view-container,
+.main-topBar-background,
+.main-trackList-trackListHeader {
+  background-color: var(--tty-bg) !important;
+}
+
+/* Header gradients on playlist, album, artist and home pages. */
+.main-entityHeader-background,
+.main-actionBarBackground-background,
+.main-home-homeHeader,
+.under-main-view {
+  background-image: none !important;
+  background-color: var(--tty-bg) !important;
+}
+
+/* Scrollbars that Spotify draws itself (OverlayScrollbars). */
+.os-scrollbar-handle {
+  background-color: var(--tty-line) !important;
+}
+.os-scrollbar-handle:hover {
+  background-color: var(--tty-accent) !important;
+}
