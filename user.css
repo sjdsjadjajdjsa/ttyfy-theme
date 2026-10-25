@@ -362,6 +362,27 @@ html:not(.ttyfy-ready)::before {
   color: var(--spice-notification-error, #ff4040);
 }
 
+#ttyfy-cava {
+  flex: none;
+  box-sizing: border-box;
+  padding: 4px 12px;
+  border-top: 1px solid var(--tty-line);
+  color: var(--tty-accent);
+  white-space: pre;
+  overflow: hidden;
+  line-height: 1;
+}
+#ttyfy-cava[hidden] {
+  display: none;
+}
+/* Hidden strip of text, only used to measure the width of one character. */
+#ttyfy-ruler {
+  position: absolute;
+  visibility: hidden;
+  white-space: pre;
+  pointer-events: none;
+}
+
 #ttyfy-bar {
   flex: none;
   display: flex;

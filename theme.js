@@ -8,7 +8,7 @@
 (function ttyfy() {
 	"use strict";
 
-	const VERSION = "0.2";
+	const VERSION = "0.3";
 	const PAGE = 15; // rows per page when the window height is unknown
 	const MAX_LINES = 600; // lines kept in the output
 	const ALIASES = { "?": "help", add: "queue", h: "help", n: "next", b: "back", prev: "previous", q: "queue", pl: "playlist", playlists: "playlist", ls: "playlist", s: "search", find: "search", p: "toggle", m: "more", exit: "gui", np: "now" };
@@ -127,6 +127,8 @@
 			hpos: 0,
 			bar: false,
 			timer: null,
+			// /cava: bars that follow the song. Off until you ask for it.
+			cava: Object.assign({ bars: "auto", rows: 4 }, store("cava") || {}, { on: false, data: null, note: "", load: 0, timer: null, vals: [] }),
 		};
 
 		// ---------- small helpers ----------
@@ -210,11 +212,14 @@
 		const inwrap = el("div", "ttyfy-inwrap");
 		const cursor = el("span", "ttyfy-cursor");
 		const mirror = el("span", "ttyfy-mirror");
+		const cavaEl = el("div", "ttyfy-cava");
+		const ruler = el("span", "ttyfy-ruler");
 		const barTitle = el("span", "ttyfy-bartitle");
 		const barInfo = el("span", "ttyfy-barinfo");
 
 		head.textContent = "ttyfy " + VERSION;
 		bar.hidden = true;
+		cavaEl.hidden = true;
 		ps.textContent = "ttyfy> ";
 		input.type = "text";
 		input.spellcheck = false;
@@ -226,7 +231,8 @@
 		bar.append(barTitle, barInfo);
 		inwrap.append(input, cursor, mirror);
 		prompt.append(ps, inwrap);
-		root.append(head, out, bar, prompt);
+		ruler.textContent = "0000000000";
+		root.append(head, out, cavaEl, bar, prompt, ruler);
 		document.body.appendChild(root);
 
 		function print(text, cls) {
@@ -320,6 +326,141 @@
 			}
 			out.scrollTop = out.scrollHeight;
 			print("bar " + (state.bar ? "on" : "off"), "dim");
+		}
+
+		// ---------- cava ----------
+		// Spotify gives no live sound to extensions, so the bars come from the song's
+		// stored analysis (loudness, beats and notes per slice), played back in time
+		// with the song. They follow the music but are not a live spectrum.
+
+		const BLOCKS = ["\u2581", "\u2582", "\u2583", "\u2584", "\u2585", "\u2586", "\u2587", "\u2588"];
+		const clamp = (x, lo, hi) => Math.min(hi, Math.max(lo, x));
+		const lerp = (a, b, k) => a + (b - a) * k;
+
+		// Last item whose start is at or before t (list sorted by start), or -1.
+		function lastBefore(list, t) {
+			let lo = 0;
+			let hi = list.length - 1;
+			if (!list.length || list[0].start > t) return -1;
+			while (lo < hi) {
+				const mid = (lo + hi + 1) >> 1;
+				if (list[mid].start <= t) lo = mid;
+				else hi = mid - 1;
+			}
+			return lo;
+		}
+
+		function loadCava() {
+			const c = state.cava;
+			const id = ++c.load;
+			const t = current();
+			c.data = null;
+			c.note = "";
+			if (!t || !/^spotify:track:/.test(t.uri || "")) {
+				c.note = "no audio analysis for this item";
+				return;
+			}
+			if (!Spicetify.getAudioData) {
+				c.note = "this Spicetify has no getAudioData";
+				print("cava: " + c.note, "err");
+				return;
+			}
+			Promise.resolve()
+				.then(() => Spicetify.getAudioData(t.uri))
+				.then((d) => {
+					if (id !== c.load) return; // song changed while this loaded
+					const segs = d && Array.isArray(d.segments) ? d.segments.filter((x) => Array.isArray(x.pitches)) : [];
+					if (!segs.length) throw new Error("this song has no analysis");
+					c.data = { segs, beats: d && Array.isArray(d.beats) ? d.beats : [] };
+				})
+				.catch((e) => {
+					if (id !== c.load) return;
+					c.data = null;
+					c.note = "no audio analysis for this song (" + errText(e) + ")";
+					print("cava: " + c.note, "dim");
+				});
+		}
+
+		// Bar heights (0 to 1) for song time tSec: loudness and beat pulse, shaped by the notes playing.
+		function cavaLevels(n, tSec) {
+			const d = state.cava.data;
+			const out = new Array(n).fill(0);
+			if (!d) return out;
+			const i = lastBefore(d.segs, tSec);
+			if (i < 0) return out;
+			const sg = d.segs[i];
+			const next = d.segs[i + 1];
+			const into = tSec - sg.start;
+			const peak = sg.loudness_max_time || 0;
+			let db;
+			if (into < peak) db = lerp(sg.loudness_start, sg.loudness_max, peak ? into / peak : 1);
+			else {
+				const endDb = next ? next.loudness_start : sg.loudness_end != null ? sg.loudness_end : sg.loudness_max;
+				db = lerp(sg.loudness_max, endDb, clamp((into - peak) / Math.max(0.001, sg.duration - peak), 0, 1));
+			}
+			let energy = Math.pow(clamp((db + 45) / 45, 0, 1), 1.3);
+			const b = lastBefore(d.beats, tSec);
+			if (b >= 0) energy *= 1 + 0.35 * Math.exp(-3 * ((tSec - d.beats[b].start) / (d.beats[b].duration || 0.5)));
+			energy = clamp(energy, 0, 1);
+			const p = sg.pitches;
+			for (let k = 0; k < n; k++) {
+				const x = n > 1 ? (k / (n - 1)) * (p.length - 1) : 0;
+				const lo = Math.floor(x);
+				const hi = Math.min(p.length - 1, lo + 1);
+				const pitch = lerp(p[lo] || 0, p[hi] || 0, x - lo);
+				out[k] = clamp(energy * (0.25 + 0.75 * Math.pow(pitch, 0.8)), 0, 1);
+			}
+			return out;
+		}
+
+		// How many bars fit: three characters each (two wide, one gap), unless set by hand.
+		function cavaCount() {
+			const c = state.cava;
+			if (c.bars !== "auto") return c.bars;
+			const cw = ruler.offsetWidth / 10 || 8;
+			const cols = Math.floor((cavaEl.clientWidth - 24) / cw);
+			return clamp(Math.floor((cols + 1) / 3), 8, 64);
+		}
+
+		function cavaTick() {
+			const c = state.cava;
+			if (root.classList.contains("ttyfy-hidden")) return; // nothing to draw while hidden
+			try {
+				const n = cavaCount();
+				const target = Player.isPlaying() ? cavaLevels(n, Player.getProgress() / 1000) : new Array(n).fill(0);
+				if (c.vals.length !== n) c.vals = new Array(n).fill(0);
+				// Rise fast, fall slowly, like cava.
+				c.vals = c.vals.map((v, k) => (target[k] > v ? v + (target[k] - v) * 0.6 : v * 0.88));
+				const rows = c.rows;
+				const lines = [];
+				for (let r = 0; r < rows; r++) {
+					let line = "";
+					for (let k = 0; k < n; k++) {
+						const h = Math.round(c.vals[k] * rows * 8);
+						let lvl = clamp(h - (rows - 1 - r) * 8, 0, 8);
+						if (r === rows - 1) lvl = Math.max(1, lvl); // a thin baseline when quiet
+						const ch = lvl ? BLOCKS[lvl - 1] : " ";
+						line += ch + ch + (k < n - 1 ? " " : "");
+					}
+					lines.push(line);
+				}
+				cavaEl.textContent = lines.join("\n");
+			} catch (e) {
+				cavaEl.textContent = "cava error: " + errText(e);
+			}
+		}
+
+		function setCava(on) {
+			const c = state.cava;
+			c.on = on;
+			cavaEl.hidden = !on;
+			clearInterval(c.timer);
+			if (on) {
+				loadCava();
+				cavaTick();
+				c.timer = setInterval(cavaTick, 50);
+			}
+			out.scrollTop = out.scrollHeight;
 		}
 
 		// ---------- data ----------
@@ -916,6 +1057,7 @@
 					has("GraphQL album query", !!(S.GraphQL && S.GraphQL.Request && S.GraphQL.Definitions && S.GraphQL.Definitions.queryAlbumTracks));
 					has("GraphQL artist query", !!(S.GraphQL && S.GraphQL.Request && S.GraphQL.Definitions && S.GraphQL.Definitions.queryArtistOverview));
 					has("CosmosAsync.get (search)", !!(S.CosmosAsync && S.CosmosAsync.get));
+					has("getAudioData (for /cava)", !!S.getAudioData);
 					has("Player.data and song-change events", !!(Player.addEventListener && Player.data !== undefined));
 					has("saved settings (localStorage)", store("debug-probe", 1) === 1);
 					store("debug-probe", null);
@@ -962,6 +1104,14 @@
 						const q = await P.PlayerAPI.getQueue();
 						return (q.queued || []).length + (q.nextUp || []).length + " items";
 					});
+					await check("audio analysis (for /cava)", async () => {
+						if (!cur || !/^spotify:track:/.test(cur.uri || "")) return "skipped: nothing playing";
+						const d = await S.getAudioData(cur.uri);
+						const segs = d && d.segments;
+						if (!Array.isArray(segs) || !segs.length) throw new Error("no segments in the answer");
+						if (!Array.isArray(segs[0].pitches) || segs[0].loudness_max == null) throw new Error("segments lack pitches or loudness");
+						return segs.length + " slices, " + ((d.beats || []).length) + " beats";
+					});
 					await check("album page", async () => {
 						const u = cur && cur.album && cur.album.uri;
 						if (!u) return "skipped: nothing playing";
@@ -973,6 +1123,26 @@
 						if (!a || !a.uri) return "skipped: nothing playing";
 						return (await artistTopTracks(a.uri)).items.length + " songs";
 					});
+				},
+			},
+			cava: {
+				desc: "/cava shows bars that follow the song, /cava off hides them, /cava bars 24, /cava bars auto, /cava rows 4",
+				run(args) {
+					const c = state.cava;
+					const [sub, val] = args.toLowerCase().split(/\s+/);
+					const usage = "usage: /cava, /cava on, /cava off, /cava bars <8-64 or auto>, /cava rows <1-8>";
+					if (sub === "bars" || sub === "rows") {
+						if (sub === "bars" && val === "auto") c.bars = "auto";
+						else if (sub === "bars" && /^\d+$/.test(val || "") && +val >= 8 && +val <= 64) c.bars = +val;
+						else if (sub === "rows" && /^\d+$/.test(val || "") && +val >= 1 && +val <= 8) c.rows = +val;
+						else return print(usage, "err");
+						store("cava", { bars: c.bars, rows: c.rows });
+						return print("cava " + sub + ": " + (sub === "bars" ? c.bars : c.rows), "dim");
+					}
+					if (sub && sub !== "on" && sub !== "off") return print(usage, "err");
+					const on = sub ? sub === "on" : !c.on;
+					setCava(on);
+					print("cava " + (on ? "on (follows the song's loudness and beat, not live sound)" : "off"), "dim");
 				},
 			},
 			last: {
@@ -1168,6 +1338,7 @@
 				}
 				refreshMarks();
 				renderBar();
+				if (state.cava.on) loadCava();
 			});
 			Player.addEventListener("onplaypause", renderBar);
 		}

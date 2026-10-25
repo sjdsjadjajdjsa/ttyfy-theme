@@ -41,10 +41,13 @@ Find more of the same:
 | `/queue 3` | add song 3 on screen to the queue |
 | `/last` | reopen the last playlist you opened |
 | `/random` | play a random playlist |
+| `/cava` | moving bars above the prompt that follow the song. `/cava off` hides them, `/cava bars 24`, `/cava rows 6` change the size |
 
 The rest: `/toggle`, `/vol 40`, `/vol +10`, `/seek 1:30`, `/seek +10`, `/shuffle` (or `/shuffle on`, `/shuffle off`), `/repeat` (or `/repeat off`, `/repeat all`, `/repeat one`), `/like`, `/unlike`, `/theme amber` (colors: green, amber, white, solarized, default), `/bar` (a one-line player bar at the bottom, off by default), `/clear`, `/about`, `/gui`.
 
 Tab completes commands, playlist names (`/playlist road` then Tab) and color names. Up and down arrows bring back old commands. A semicolon before a `/command` chains commands: `/vol 30; /next`. PageUp and PageDown scroll the screen.
+
+The `/cava` bars follow the song's loudness, beat and notes from Spotify's stored analysis, played back in time with the music. Spotify gives themes no live sound, so it is not a true spectrum, and a few songs have no analysis (the bars then stay flat).
 
 On start the terminal opens on your playlists, so you can type a number right away.
 
