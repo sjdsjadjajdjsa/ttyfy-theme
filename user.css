@@ -253,6 +253,27 @@ a[aria-current="page"]::before,
 /* rename them. The terminal covers the whole window.                 */
 /* ------------------------------------------------------------------ */
 
+/* Black cover from the first paint until theme.js has drawn the terminal,
+   so normal Spotify never flashes. theme.js adds .ttyfy-ready to <html>.
+   If theme.js never starts, the cover lifts by itself after 5 seconds. */
+html:not(.ttyfy-ready)::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 2147483001;
+  pointer-events: none;
+  background-color: var(--spice-main, #000000);
+  animation: ttyfy-cover-off 0s linear 5s forwards;
+}
+@keyframes ttyfy-cover-off {
+  to {
+    visibility: hidden;
+  }
+}
+
 #ttyfy {
   position: fixed;
   top: 0;
