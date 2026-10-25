@@ -1,6 +1,6 @@
 {
   "name": "ttyfy",
-  "description": "Make Spotify look like a terminal. Monospace font, black background, square 1px borders, classic green by default.",
+  "description": "Turn Spotify into a terminal. Type /playlist, /play, /search. Monospace, black, square 1px borders, classic green by default.",
   "preview": "preview.png",
   "usercss": "user.css",
   "schemes": "color.ini",
@@ -10,8 +10,19 @@
       "url": "https://github.com/sjdsjadjajdjsa"
     }
   ],
-  "tags": ["dark", "monospace", "terminal", "minimal", "green", "amber"],
+  "tags": [
+    "dark",
+    "monospace",
+    "terminal",
+    "cli",
+    "minimal",
+    "green",
+    "amber"
+  ],
   "branch": "main",
   "user": "sjdsjadjajdjsa",
-  "repo": "ttyfy-theme"
+  "repo": "ttyfy-theme",
+  "include": [
+    "https://cdn.jsdelivr.net/gh/sjdsjadjajdjsa/ttyfy-theme@main/theme.js"
+  ]
 }

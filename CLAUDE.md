@@ -1,10 +1,11 @@
 # ttyfy
 
-A Spicetify theme that makes Spotify look like a terminal. It is a theme, not a custom app. Use the name "ttyfy" everywhere.
+A Spicetify theme that turns Spotify into a command line. It is a theme, not a custom app: `theme.js` sits next to `user.css`, Spicetify loads both. Use the name "ttyfy" everywhere.
 
 ## Files
 
-- `user.css`: all the styling. Sections 1 to 5 use only `--spice-*` variables, tags and role/aria/data-testid attributes. Section 6 is the only place for Spotify class names, keep it that way and keep it commented.
+- `theme.js`: draws a full-screen terminal over Spotify and runs the slash commands with the Spicetify API (`Spicetify.Player`, `Platform.RootlistAPI`, `PlaylistAPI`, `LibraryAPI`, `CosmosAsync`). It builds text with `textContent`, never HTML. To add a command, add an entry to the `commands` object (name, `desc`, `run(args)`). If it fails to start, the CSS-only look still works.
+- `user.css`: all the styling. Sections 1 to 5 use only `--spice-*` variables, tags and role/aria/data-testid attributes. Section 6 is the only place for Spotify class names, keep it that way and keep it commented. Section 7 styles the terminal and only uses ids that theme.js creates.
 - `color.ini`: color schemes. The first one (`green`) is the default.
 - `manifest.json`: Spicetify Marketplace entry.
 - `preview.png`: placeholder image, replace with a real screenshot.
@@ -31,12 +32,15 @@ There is no build and Spotify cannot run in CI, so test by hand:
 2. `spicetify config current_theme ttyfy color_scheme <scheme>` then `spicetify apply`.
 3. For faster edits: `spicetify watch -s` reloads on every save.
 4. Use `spicetify enable-devtool` and Ctrl+Shift+I in Spotify to inspect elements.
-5. Check each scheme: sidebar, home, a playlist, search, player bar, a context menu, the right sidebar.
-6. Check `manifest.json` is valid JSON.
+5. Check each scheme in the terminal and, after `/gui`, in normal Spotify: home, a playlist, search, player bar, a context menu, the right sidebar.
+6. Try every command in the README table.
+7. Check `manifest.json` is valid JSON.
+
+To try theme.js without Spotify, load it in a plain HTML page with a fake `Spicetify` object (Playwright works).
 
 ## Rules
 
 - No rounded corners, shadows or gradients.
-- Never hide or disable a button.
+- The terminal is the main screen. Keep an escape back to normal Spotify (`/gui`, Ctrl+`).
 - Prefer variables and attributes over class names. If a class name is needed, put it in section 6.
 - Write comments and docs in plain words.
