@@ -8,8 +8,9 @@
  *   4. Controls       inputs, menus, dialogs
  *   5. Prompt/cursor  ">" marker and blinking block cursor
  *   6. SPOTIFY CLASS NAMES  the only part that can break after an update
+ *   7. Terminal       styles for the command line that theme.js draws
  *
- * Sections 1 to 5 use only variables, tags and role/aria/data-testid
+ * Sections 1 to 5 and 7 use only variables, tags and role/aria/data-testid
  * attributes. Section 6 uses Spotify class names. Fix those first when
  * something looks off after a Spotify update.
  */
@@ -243,4 +244,106 @@ a[aria-current="page"]::before,
 }
 .os-scrollbar-handle:hover {
   background-color: var(--tty-accent) !important;
+}
+
+/* ------------------------------------------------------------------ */
+/* 7. Terminal (drawn by theme.js)                                    */
+/*                                                                    */
+/* Only uses ids that ttyfy itself creates, so Spotify updates cannot */
+/* rename them. The terminal covers the whole window.                 */
+/* ------------------------------------------------------------------ */
+
+#ttyfy {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 2147483000;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--tty-bg);
+  color: var(--tty-fg);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+#ttyfy.ttyfy-hidden {
+  display: none;
+}
+
+/* Top strip: drag the window here. The right padding leaves room for
+   the window buttons, the left padding on Mac for the traffic lights. */
+#ttyfy-head {
+  flex: none;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  padding: 0 140px 0 12px;
+  border-bottom: 1px solid var(--tty-line);
+  color: var(--tty-dim);
+  -webkit-app-region: drag;
+  user-select: none;
+}
+#ttyfy.ttyfy-mac #ttyfy-head {
+  padding-left: 84px;
+}
+
+#ttyfy-out {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px 12px;
+  user-select: text;
+}
+#ttyfy-out > div {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+#ttyfy-out .ty-acc {
+  color: var(--tty-accent);
+}
+#ttyfy-out .ty-dim {
+  color: var(--tty-dim);
+}
+#ttyfy-out .ty-echo {
+  color: var(--tty-accent-hi);
+}
+#ttyfy-out .ty-err {
+  color: var(--spice-notification-error, #ff4040);
+}
+
+#ttyfy-bar {
+  flex: none;
+  padding: 2px 12px;
+  border-top: 1px solid var(--tty-accent);
+  white-space: pre;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#ttyfy-bar[hidden] {
+  display: none;
+}
+
+#ttyfy-prompt {
+  flex: none;
+  display: flex;
+  padding: 6px 12px;
+  border-top: 1px solid var(--tty-accent);
+}
+#ttyfy-ps {
+  color: var(--tty-accent);
+  white-space: pre;
+}
+#ttyfy-in {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0;
+  border: 0 !important;
+  outline: none !important;
+  background: transparent !important;
+  color: var(--tty-fg) !important;
+  font-size: inherit;
+  caret-color: var(--tty-accent);
+  caret-shape: block;
 }
