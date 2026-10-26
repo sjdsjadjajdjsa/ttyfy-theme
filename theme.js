@@ -15,10 +15,10 @@
 
 	// Same colors as color.ini. Keep the two in sync (see CLAUDE.md).
 	const PALETTES = {
-		green: { text: "33ff33", subtext: "22aa22", main: "000000", sidebar: "000000", player: "000000", card: "061006", button: "33ff33", "button-active": "99ff99", "button-disabled": "145214", "tab-active": "0b2a0b", notification: "0b2a0b", "notification-error": "ff4040", "selected-row": "66ff66", misc: "1c5c1c" },
-		amber: { text: "ffb000", subtext: "b37a00", main: "000000", sidebar: "000000", player: "000000", card: "140e00", button: "ffb000", "button-active": "ffd36b", "button-disabled": "5c4000", "tab-active": "2a1d00", notification: "2a1d00", "notification-error": "ff4040", "selected-row": "ffcc55", misc: "664600" },
-		white: { text: "e6e6e6", subtext: "9a9a9a", main: "000000", sidebar: "000000", player: "000000", card: "0f0f0f", button: "ffffff", "button-active": "cccccc", "button-disabled": "4d4d4d", "tab-active": "1f1f1f", notification: "1f1f1f", "notification-error": "ff5555", "selected-row": "ffffff", misc: "555555" },
-		solarized: { text: "93a1a1", subtext: "839496", main: "002b36", sidebar: "002b36", player: "002b36", card: "073642", button: "2aa198", "button-active": "35c4b9", "button-disabled": "586e75", "tab-active": "073642", notification: "073642","notification-error": "f0605d", "selected-row": "eee8d5", misc: "586e75" },
+		green: { text: "33ff33", subtext: "22aa22", main: "000000", sidebar: "000000", player: "000000", card: "061006", button: "33ff33", "button-active": "99ff99", "button-disabled": "145214", "tab-active": "0b2a0b", notification: "0b2a0b", "notification-error": "ff4040", "selected-row": "66ff66", misc: "1c5c1c", shadow: "000000", equalizer: "33ff33" },
+		amber: { text: "ffb000", subtext: "b37a00", main: "000000", sidebar: "000000", player: "000000", card: "140e00", button: "ffb000", "button-active": "ffd36b", "button-disabled": "5c4000", "tab-active": "2a1d00", notification: "2a1d00", "notification-error": "ff4040", "selected-row": "ffcc55", misc: "664600", shadow: "000000", equalizer: "ffb000" },
+		white: { text: "e6e6e6", subtext: "9a9a9a", main: "000000", sidebar: "000000", player: "000000", card: "0f0f0f", button: "ffffff", "button-active": "cccccc", "button-disabled": "4d4d4d", "tab-active": "1f1f1f", notification: "1f1f1f", "notification-error": "ff5555", "selected-row": "ffffff", misc: "555555", shadow: "000000", equalizer: "ffffff" },
+		solarized: { text: "93a1a1", subtext: "839496", main: "002b36", sidebar: "002b36", player: "002b36", card: "073642", button: "2aa198", "button-active": "35c4b9", "button-disabled": "586e75", "tab-active": "073642", notification: "073642","notification-error": "f0605d", "selected-row": "eee8d5", misc: "586e75", shadow: "002b36", equalizer: "2aa198" },
 	};
 
 	// localStorage can be missing or blocked, so every use is wrapped.
