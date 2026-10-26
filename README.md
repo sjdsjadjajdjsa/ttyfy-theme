@@ -1,10 +1,10 @@
 # ttyfy
 
-[![release](https://img.shields.io/github/v/tag/sjdsjadjajdjsa/ttyfy-theme?label=release&style=flat&labelColor=1f1f1f&color=b48cf2)](https://github.com/sjdsjadjajdjsa/ttyfy-theme/tags)
-[![checks](https://img.shields.io/github/actions/workflow/status/sjdsjadjajdjsa/ttyfy-theme/check.yml?branch=main&label=checks&style=flat&labelColor=1f1f1f)](https://github.com/sjdsjadjajdjsa/ttyfy-theme/actions/workflows/check.yml)
-[![license](https://img.shields.io/github/license/sjdsjadjajdjsa/ttyfy-theme?style=flat&labelColor=1f1f1f&color=6fe3b0)](LICENSE)
-[![runs on](https://img.shields.io/badge/runs_on-Windows_%C2%B7_macOS_%C2%B7_Linux-5bc0eb?style=flat&labelColor=1f1f1f)](#install)
-[![made for](https://img.shields.io/badge/made_for-Spicetify-33ff33?style=flat&labelColor=1f1f1f)](https://spicetify.app)
+[![ci](https://img.shields.io/github/actions/workflow/status/sjdsjadjajdjsa/ttyfy-theme/check.yml?branch=main&label=ci&logo=github&logoColor=white)](https://github.com/sjdsjadjajdjsa/ttyfy-theme/actions/workflows/check.yml)
+[![release](https://img.shields.io/github/v/tag/sjdsjadjajdjsa/ttyfy-theme?label=release&color=orange)](https://github.com/sjdsjadjajdjsa/ttyfy-theme/tags)
+[![license](https://img.shields.io/github/license/sjdsjadjajdjsa/ttyfy-theme?color=green)](LICENSE)
+[![runs on](https://img.shields.io/badge/runs_on-Windows_%C2%B7_macOS_%C2%B7_Linux-blue)](#install)
+[![made for](https://img.shields.io/badge/made_for-Spicetify-brightgreen)](https://spicetify.app)
 
 Turn Spotify into a terminal. A theme for [Spicetify](https://spicetify.app).
 
