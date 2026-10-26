@@ -12,11 +12,11 @@ Turn Spotify into a terminal. A theme for [Spicetify](https://spicetify.app).
 
 ![Recording of ttyfy: browse a playlist, play a song, turn on the player bar and the moving bars, switch colors](docs/images/demo.gif)
 
+</div>
+
 Open Spotify and you get a black screen with a prompt. No covers, no buttons. You type `/playlist`, pick a number, and music plays. It runs on top of the normal Spotify app, so your account, library and playback all work as usual.
 
 *The recording and screenshots on this page come from a test setup, not a real account. The songs and artists are real examples. The playlist names and playback are made up, and the recording has no sound.*
-
-</div>
 
 ## What you get
 
