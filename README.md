@@ -3,7 +3,7 @@
 # ttyfy
 
 [![ci](https://img.shields.io/github/actions/workflow/status/sjdsjadjajdjsa/ttyfy-theme/check.yml?branch=main&label=ci&logo=github&logoColor=white)](https://github.com/sjdsjadjajdjsa/ttyfy-theme/actions/workflows/check.yml)
-[![release](https://img.shields.io/github/v/tag/sjdsjadjajdjsa/ttyfy-theme?label=release&color=orange)](https://github.com/sjdsjadjajdjsa/ttyfy-theme/tags)
+[![version](https://img.shields.io/badge/version-0.4.0-orange)](CHANGELOG.md)
 [![license](https://img.shields.io/github/license/sjdsjadjajdjsa/ttyfy-theme?color=green)](LICENSE)
 [![runs on](https://img.shields.io/badge/runs_on-Windows_%C2%B7_macOS_%C2%B7_Linux-blue)](#install)
 [![made for](https://img.shields.io/badge/made_for-Spicetify-brightgreen)](https://spicetify.app)
