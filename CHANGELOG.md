@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4
+
+- A small `> ttyfy` button appears while the terminal is hidden, so there is always a way back.
+- `/start gui` and `/start terminal` choose what opens at launch.
+
 ## 0.3
 
 - Added `/cava`: bars that follow the song, drawn as solid blocks.

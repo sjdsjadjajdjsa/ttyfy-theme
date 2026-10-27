@@ -390,6 +390,29 @@ html:not(.ttyfy-ready)::before {
   pointer-events: none;
 }
 
+/* Small button shown only while the terminal is hidden, to bring it back. */
+#ttyfy-open {
+  position: fixed;
+  right: 16px;
+  bottom: 104px;
+  z-index: 2147483000;
+  padding: 4px 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--tty-accent);
+  background: var(--tty-bg);
+  border: 1px solid var(--tty-accent);
+  cursor: pointer;
+  opacity: 0.6;
+}
+#ttyfy-open:hover,
+#ttyfy-open:focus-visible {
+  opacity: 1;
+}
+#ttyfy-open[hidden] {
+  display: none;
+}
+
 #ttyfy-bar {
   flex: none;
   display: flex;

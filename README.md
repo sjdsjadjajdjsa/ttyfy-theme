@@ -65,7 +65,13 @@ Set `current_theme` to `marketplace`, then install ttyfy from the Themes tab. Ma
 2. Type a song number to play it.
 3. Type `/help` for the short list of commands, `/help all` for every one.
 
-Press Ctrl+` any time to hide the terminal and see normal Spotify. Press it again to come back.
+## Switching between the terminal and normal Spotify
+
+You can go back and forth any time. The theme stays on either way.
+
+- **Hide the terminal:** press Ctrl+` or type `/gui`. You get normal Spotify, styled like a terminal.
+- **Bring it back:** press Ctrl+` again, or click the small `> ttyfy` button in the bottom-right corner. The button only shows while the terminal is hidden.
+- **Choose what opens at launch:** `/start gui` opens normal Spotify, `/start terminal` opens the terminal (the default). Type `/start` to see the current setting.
 
 ## Commands
 
@@ -100,7 +106,9 @@ More:
 | `/theme amber` | change colors: green, amber, white, solarized, default |
 | `/bar` | a one-line player bar at the bottom, off by default |
 | `/cava` | moving bars that follow the song. `/cava off`, `/cava bars 24`, `/cava rows 6` |
-| `/clear`, `/about`, `/gui` | clear the screen, version and keys, hide the terminal |
+| `/gui` | hide the terminal and show normal Spotify. Ctrl+` or the `> ttyfy` button brings it back |
+| `/start gui`, `/start terminal` | choose what opens at launch |
+| `/clear`, `/about` | clear the screen, version and keys |
 
 Keys: Tab completes commands, playlist names and color names. Up and down bring back old commands. PageUp and PageDown scroll. A semicolon before a `/command` chains commands, for example `/vol 30; /next`.
 

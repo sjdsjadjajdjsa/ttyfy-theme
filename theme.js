@@ -3,12 +3,13 @@
 // over Spotify's normal interface. Music keeps playing underneath.
 // If this file fails to start, the theme falls back to the plain CSS look.
 //
-// Ctrl+` hides or shows the terminal. /gui does the same.
+// Ctrl+` hides or shows the terminal. /gui does the same. While the terminal is
+// hidden, a small "> ttyfy" button in the corner brings it back.
 
 (function ttyfy() {
 	"use strict";
 
-	const VERSION = "0.3";
+	const VERSION = "0.4";
 	const PAGE = 15; // rows per page when the window height is unknown
 	const MAX_LINES = 600; // lines kept in the output
 	const ALIASES = { "?": "help", add: "queue", h: "help", n: "next", b: "back", prev: "previous", q: "queue", pl: "playlist", playlists: "playlist", ls: "playlist", s: "search", find: "search", p: "toggle", m: "more", exit: "gui", np: "now" };
@@ -212,6 +213,7 @@
 		const inwrap = el("div", "ttyfy-inwrap");
 		const cursor = el("span", "ttyfy-cursor");
 		const mirror = el("span", "ttyfy-mirror");
+		const openBtn = el("button", "ttyfy-open");
 		const cavaEl = el("div", "ttyfy-cava");
 		const ruler = el("span", "ttyfy-ruler");
 		const barTitle = el("span", "ttyfy-bartitle");
@@ -219,6 +221,11 @@
 
 		head.textContent = "ttyfy " + VERSION;
 		bar.hidden = true;
+		openBtn.hidden = true;
+		openBtn.type = "button";
+		openBtn.textContent = "> ttyfy";
+		openBtn.title = "Open the ttyfy terminal (Ctrl+`)";
+		openBtn.setAttribute("aria-label", "Open the ttyfy terminal");
 		cavaEl.hidden = true;
 		ps.textContent = "ttyfy> ";
 		input.type = "text";
@@ -234,6 +241,7 @@
 		ruler.textContent = "0000000000";
 		root.append(head, out, cavaEl, bar, prompt, ruler);
 		document.body.appendChild(root);
+		document.body.appendChild(openBtn);
 
 		function print(text, cls) {
 			const line = el("div", "", cls ? "ty-" + cls : "");
@@ -276,12 +284,15 @@
 
 		function setGui(showGui) {
 			root.classList.toggle("ttyfy-hidden", showGui);
+			openBtn.hidden = !showGui;
 			if (!showGui) {
 				out.scrollTop = out.scrollHeight;
 				input.focus();
 				updateCursor();
 			}
 		}
+
+		openBtn.addEventListener("click", () => setGui(false));
 
 		function toggleGui() {
 			setGui(!root.classList.contains("ttyfy-hidden"));
@@ -744,6 +755,7 @@
 					print("  /play words   play the first match");
 					print("  /pause  /resume  /next  /previous");
 					print("  /now          what is playing");
+					print("  /gui          show normal Spotify (Ctrl+` or the > ttyfy button comes back)");
 					print("  /help all     every command, /help <command> for one");
 					if (args !== "all") return;
 					print("more:", "acc");
@@ -1025,7 +1037,7 @@
 				desc: "version and keys",
 				run() {
 					print("ttyfy " + VERSION, "acc");
-					print("  Ctrl+` shows or hides this terminal, /gui does the same");
+					print("  Ctrl+` shows or hides this terminal, /gui does the same, and a > ttyfy button appears while it is hidden");
 					print("  Tab completes, Up and Down bring back commands, PageUp and PageDown scroll"
 					);
 					print("  chain commands with ; before a /command, for example /vol 30; /next");
@@ -1159,7 +1171,22 @@
 				},
 			},
 			bar: { desc: "show or hide the status bar", run: toggleBar },
-			gui: { desc: "hide the terminal and show normal Spotify (Ctrl+` brings it back)", run: () => setGui(true) },
+			gui: {
+				desc: "hide the terminal and show normal Spotify. Ctrl+` or the > ttyfy button brings it back",
+				run() {
+					setGui(true);
+				},
+			},
+			start: {
+				desc: "/start gui opens normal Spotify (with the theme) at launch, /start terminal opens the terminal",
+				run(args) {
+					const want = args.toLowerCase();
+					if (!want) return print("at launch: " + (store("start") === "gui" ? "normal Spotify" : "the terminal") + ". Change it with /start gui or /start terminal", "dim");
+					if (want !== "gui" && want !== "terminal") return print("usage: /start gui or /start terminal", "err");
+					store("start", want === "gui" ? "gui" : null);
+					print("at launch ttyfy will open " + (want === "gui" ? "normal Spotify. Ctrl+` or the > ttyfy button opens the terminal" : "the terminal"), "acc");
+				},
+			},
 		};
 
 		async function openPlaylistAndPlay(pl) {
@@ -1340,6 +1367,7 @@
 
 		setTitle();
 		document.documentElement.classList.add("ttyfy-ready");
+		if (store("start") === "gui") setGui(true); // you chose to launch in normal Spotify
 
 		function welcome() {
 			let t = null;
