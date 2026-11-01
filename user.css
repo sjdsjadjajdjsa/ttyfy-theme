@@ -382,6 +382,23 @@ html:not(.ttyfy-ready)::before {
   min-height: 2px;
   background: var(--tty-accent);
 }
+/* Falling snow (/snow). Sits behind the text, never takes clicks. */
+#ttyfy-snow {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: -1;
+  margin: 0;
+  overflow: hidden;
+  white-space: pre;
+  pointer-events: none;
+  color: var(--tty-fg);
+}
+#ttyfy-snow[hidden] {
+  display: none;
+}
 /* Hidden strip of text, only used to measure the width of one character. */
 #ttyfy-ruler {
   position: absolute;

@@ -3,7 +3,7 @@
 # ttyfy
 
 [![ci](https://img.shields.io/github/actions/workflow/status/sjdsjadjajdjsa/ttyfy-theme/check.yml?branch=main&label=ci&logo=github&logoColor=white)](https://github.com/sjdsjadjajdjsa/ttyfy-theme/actions/workflows/check.yml)
-[![version](https://img.shields.io/badge/version-0.4.0-orange)](CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-0.5.0-orange)](CHANGELOG.md)
 [![license](https://img.shields.io/github/license/sjdsjadjajdjsa/ttyfy-theme?color=green)](LICENSE)
 [![runs on](https://img.shields.io/badge/runs_on-Windows_%C2%B7_macOS_%C2%B7_Linux-blue)](#install)
 [![made for](https://img.shields.io/badge/made_for-Spicetify-brightgreen)](https://spicetify.app)
@@ -23,7 +23,7 @@ Open Spotify and you get a black screen with a prompt. No covers, no buttons. Yo
 - A command line for Spotify: browse playlists, search, play, queue, skip, set volume, like songs.
 - Type a number to pick from any list on screen. No mouse needed.
 - A one-line player bar and moving bars (`/cava`), both off until you ask for them.
-- Four color schemes: green (default), amber, white and solarized. Change them on the fly with `/theme`.
+- Five color schemes: green (default), amber, white, solarized and christmas. Change them on the fly with `/theme`.
 - Monospace font, square corners, 1px borders, no shadows or gradients. Normal Spotify is restyled the same way if you hide the terminal.
 - A built-in checker (`/debug live`) that tells you which parts work in your version of Spotify.
 
@@ -53,7 +53,7 @@ spicetify config color_scheme green
 spicetify apply
 ```
 
-To change the scheme later, swap `green` for `amber`, `white` or `solarized` and run `spicetify apply` again.
+To change the scheme later, swap `green` for `amber`, `white`, `solarized` or `christmas` and run `spicetify apply` again.
 
 ### Marketplace
 
@@ -103,9 +103,10 @@ More:
 | `/seek 1:30`, `/seek +10` | jump in the song |
 | `/shuffle`, `/repeat` | toggle shuffle, cycle repeat (or `/shuffle on`, `/repeat all`) |
 | `/like`, `/unlike` | save or remove the current song |
-| `/theme amber` | change colors: green, amber, white, solarized, default |
+| `/theme amber` | change colors: green, amber, white, solarized, christmas, default |
 | `/bar` | a one-line player bar at the bottom, off by default |
 | `/cava` | moving bars that follow the song. `/cava off`, `/cava bars 24`, `/cava rows 6` |
+| `/snow` | let it snow behind the text. `/snow off` stops it |
 | `/gui` | hide the terminal and show normal Spotify. Ctrl+` or the `> ttyfy` button brings it back |
 | `/start gui`, `/start terminal` | choose what opens at launch |
 | `/clear`, `/about` | clear the screen, version and keys |
@@ -122,6 +123,7 @@ About `/cava`: Spotify gives themes no live sound, so the bars are not a true sp
 | `amber` | amber on black |
 | `white` | white on black |
 | `solarized` | soft solarized colors on dark teal |
+| `christmas` | snow white text and red accents on dark green. Try it with `/snow` |
 
 ## Turn it off
 

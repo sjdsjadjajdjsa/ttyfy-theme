@@ -9,7 +9,7 @@
 (function ttyfy() {
 	"use strict";
 
-	const VERSION = "0.4";
+	const VERSION = "0.5";
 	const PAGE = 15; // rows per page when the window height is unknown
 	const MAX_LINES = 600; // lines kept in the output
 	const ALIASES = { "?": "help", add: "queue", h: "help", n: "next", b: "back", prev: "previous", q: "queue", pl: "playlist", playlists: "playlist", ls: "playlist", s: "search", find: "search", p: "toggle", m: "more", exit: "gui", np: "now" };
@@ -20,6 +20,7 @@
 		amber: { text: "ffb000", subtext: "b37a00", main: "000000", sidebar: "000000", player: "000000", card: "140e00", button: "ffb000", "button-active": "ffd36b", "button-disabled": "5c4000", "tab-active": "2a1d00", notification: "2a1d00", "notification-error": "ff4040", "selected-row": "ffcc55", misc: "664600", shadow: "000000", equalizer: "ffb000" },
 		white: { text: "e6e6e6", subtext: "9a9a9a", main: "000000", sidebar: "000000", player: "000000", card: "0f0f0f", button: "ffffff", "button-active": "cccccc", "button-disabled": "4d4d4d", "tab-active": "1f1f1f", notification: "1f1f1f", "notification-error": "ff5555", "selected-row": "ffffff", misc: "555555", shadow: "000000", equalizer: "ffffff" },
 		solarized: { text: "93a1a1", subtext: "839496", main: "002b36", sidebar: "002b36", player: "002b36", card: "073642", button: "2aa198", "button-active": "35c4b9", "button-disabled": "586e75", "tab-active": "073642", notification: "073642","notification-error": "f0605d", "selected-row": "eee8d5", misc: "586e75", shadow: "002b36", equalizer: "2aa198" },
+		christmas: { text: "e8f0e8", subtext: "7fb88a", main: "06120a", sidebar: "06120a", player: "06120a", card: "0c2214", button: "ff4b4b", "button-active": "ff8080", "button-disabled": "5a2020", "tab-active": "12301b", notification: "12301b", "notification-error": "ffb347", "selected-row": "5dff7f", misc: "2e6b3f", shadow: "06120a", equalizer: "ff4b4b" },
 	};
 
 	// localStorage can be missing or blocked, so every use is wrapped.
@@ -130,6 +131,8 @@
 			timer: null,
 			// /cava: bars that follow the song. Off until you ask for it.
 			cava: Object.assign({ bars: "auto", rows: 4 }, store("cava") || {}, { on: false, data: null, note: "", load: 0, timer: null, vals: [] }),
+			// /snow: falling flakes behind the text. Off until you ask for it.
+			snow: { on: false, timer: null, flakes: [] },
 		};
 
 		// ---------- small helpers ----------
@@ -215,6 +218,7 @@
 		const mirror = el("span", "ttyfy-mirror");
 		const openBtn = el("button", "ttyfy-open");
 		const cavaEl = el("div", "ttyfy-cava");
+		const snowEl = el("div", "ttyfy-snow");
 		const ruler = el("span", "ttyfy-ruler");
 		const barTitle = el("span", "ttyfy-bartitle");
 		const barInfo = el("span", "ttyfy-barinfo");
@@ -227,6 +231,8 @@
 		openBtn.title = "Open the ttyfy terminal (Ctrl+`)";
 		openBtn.setAttribute("aria-label", "Open the ttyfy terminal");
 		cavaEl.hidden = true;
+		snowEl.hidden = true;
+		snowEl.setAttribute("aria-hidden", "true");
 		ps.textContent = "ttyfy> ";
 		input.type = "text";
 		input.spellcheck = false;
@@ -239,7 +245,7 @@
 		inwrap.append(input, cursor, mirror);
 		prompt.append(ps, inwrap);
 		ruler.textContent = "0000000000";
-		root.append(head, out, cavaEl, bar, prompt, ruler);
+		root.append(snowEl, head, out, cavaEl, bar, prompt, ruler);
 		document.body.appendChild(root);
 		document.body.appendChild(openBtn);
 
@@ -465,6 +471,42 @@
 				c.timer = setInterval(cavaTick, 50);
 			}
 			out.scrollTop = out.scrollHeight;
+		}
+
+		// ---------- snow ----------
+
+		// One step: every flake falls a row, some drift sideways, new ones start at the top.
+		// The grid is drawn as plain text, one character per flake.
+		function snowTick() {
+			const s = state.snow;
+			const cw = ruler.offsetWidth / 10 || 8;
+			const lh = parseFloat(getComputedStyle(snowEl).lineHeight) || 21;
+			const cols = Math.floor(snowEl.clientWidth / cw);
+			const rows = Math.floor(snowEl.clientHeight / lh);
+			if (cols < 1 || rows < 1) return; // the terminal is hidden
+			const next = [];
+			for (const f of s.flakes) {
+				f.y += 1;
+				f.x += Math.random() < 0.3 ? (Math.random() < 0.5 ? -1 : 1) : 0;
+				if (f.y < rows && f.x >= 0 && f.x < cols) next.push(f);
+			}
+			const fresh = Math.max(1, Math.round(cols / 30));
+			for (let k = 0; k < fresh; k++) if (Math.random() < 0.8) next.push({ x: Math.floor(Math.random() * cols), y: 0, c: Math.random() < 0.6 ? "*" : "." });
+			s.flakes = next;
+			const grid = [];
+			for (let r = 0; r < rows; r++) grid.push(new Array(cols).fill(" "));
+			for (const f of next) grid[f.y][f.x] = f.c;
+			snowEl.textContent = grid.map((r) => r.join("")).join("\n");
+		}
+
+		function setSnow(on) {
+			const s = state.snow;
+			s.on = on;
+			snowEl.hidden = !on;
+			clearInterval(s.timer);
+			s.flakes = [];
+			snowEl.textContent = "";
+			if (on) s.timer = setInterval(snowTick, 150);
 		}
 
 		// ---------- data ----------
@@ -1158,8 +1200,18 @@
 					return openPlaylist(pl);
 				},
 			},
+			snow: {
+				desc: "/snow lets it snow behind the text, /snow off stops it",
+				run(args) {
+					const sub = args.toLowerCase().trim();
+					if (sub && sub !== "on" && sub !== "off") return print("usage: /snow, /snow on, /snow off", "err");
+					const on = sub ? sub === "on" : !state.snow.on;
+					setSnow(on);
+					print("snow " + (on ? "on" : "off"), "dim");
+				},
+			},
 			theme: {
-				desc: "/theme lists colors, /theme amber changes them (green, amber, white, solarized, default)",
+				desc: "/theme lists colors, /theme amber changes them (green, amber, white, solarized, christmas, default)",
 				run(args) {
 					const name = args.toLowerCase();
 					if (!name) return print("colors: " + Object.keys(PALETTES).join(", ") + ", default  (now: " + (theme || "default") + ")");

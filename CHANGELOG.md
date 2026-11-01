@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5
+
+- New color scheme `christmas`: red and green on dark green.
+- `/snow` lets it snow behind the text. Off until you ask for it.
+
 ## 0.4
 
 - A small `> ttyfy` button appears while the terminal is hidden, so there is always a way back.
