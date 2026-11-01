@@ -8,7 +8,11 @@ A Spicetify theme that turns Spotify into a command line. It is a theme, not a c
 - `user.css`: all the styling. Sections 1 to 5 use only `--spice-*` variables, tags and role/aria/data-testid attributes. Section 6 is the only place for Spotify class names, keep it that way and keep it commented. Section 7 styles the terminal and only uses ids that theme.js creates.
 - `color.ini`: color schemes. The first one (`green`) is the default. `theme.js` has a copy of the same colors (`PALETTES`) for `/theme`, so change both when you add or edit a scheme.
 - `manifest.json`: Spicetify Marketplace entry.
-- `preview.png`: placeholder image, replace with a real screenshot.
+- `preview.png`: the Marketplace preview image.
+- `docs/images/`: screenshots and the demo recording used in the README.
+- `CHANGELOG.md`: what changed in each version.
+- `scripts/check.js`: the checks that run in CI (see Test).
+- `.github/workflows/check.yml`: runs `scripts/check.js` on every push.
 - `README.md`: install steps for users.
 
 ## Colors
@@ -38,9 +42,13 @@ There is no build and Spotify cannot run in CI, so test by hand:
 
 To try theme.js without Spotify, load it in a plain HTML page with a fake `Spicetify` object (Playwright works).
 
+## Version
+
+When you bump the version, change it in three places: `VERSION` in `theme.js`, the version badge in `README.md`, and a new entry at the top of `CHANGELOG.md`.
+
 ## Publishing
 
-The Marketplace lists any public repo with the GitHub topic `spicetify-themes` and a `manifest.json` in the root of the default branch. It loads `theme.js` from the `include` URL, which must be absolute. Replace `preview.png` with a real screenshot first. Marketplace installs cache files through jsDelivr, so a push can take hours to reach users.
+The Marketplace lists any public repo with the GitHub topic `spicetify-themes` and a `manifest.json` in the root of the default branch. It loads `theme.js` from the `include` URL, which must be absolute. Marketplace installs cache files through jsDelivr, so a push can take hours to reach users.
 
 ## Rules
 
